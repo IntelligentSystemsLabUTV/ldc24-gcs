@@ -1,6 +1,8 @@
-# dua-template
+# ldc24-gcs
 
-GitHub template repositories for projects based on the Distributed Unified Architecture.
+GCS software for LDC24.
+
+## DUA integration
 
 See [`dua-template.md`](dua-template.md) for more information.
 
