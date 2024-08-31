@@ -1,0 +1,4 @@
+[submodule "src/ldc24-description"]
+	path = src/ldc24-description
+	url = git@github.com:IntelligentSystemsLabUTV/ldc24-description.git
+	branch = master
