@@ -2,3 +2,7 @@
 	path = src/ldc24-description
 	url = git@github.com:IntelligentSystemsLabUTV/ldc24-description.git
 	branch = master
+[submodule "src/zed_drivers"]
+	path = src/zed_drivers
+	url = git@github.com:dotX-Automation/zed_drivers.git
+	branch = master
