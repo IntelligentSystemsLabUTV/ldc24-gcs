@@ -1,0 +1,36 @@
+/ptz/axis_camera_tracker:
+  ros__parameters:
+    aruco_numbers:
+      - 15
+    aruco_size: 0.1
+    calibration_file_path: /home/neo/workspace/src/axis_camera_driver/src/axis_camera_tracker/config/calibration_9999.yaml
+    err_thr: 0.1
+    err_thr_zoom: 0.1
+    frame_camera: ptz/camera_link
+    frame_fixed: map
+    frames_track_to_search: 50
+    k_tilt: 0.1
+    kpx: 2.0
+    kpy: 2.0
+    n_loops: 2
+    padding: 20
+    pan_l: 0.0
+    pan_r: 40.0
+    pan_step: 1.0
+    thr_sharpness: 600.0
+    thr_time: 10.0
+    tilt_des_down: -45.0
+    tilt_des_up: -10.0
+    topic_command: /ptz/command
+    topic_hmi_aruco: /hmi/found_target/visual
+    topic_hmi_selfie: /ptz/selfie
+    topic_image_ptzf: /ptz/axis_image
+    topic_image_target: /axis_camera_tracker/image_color
+    topic_start: /valid_targets
+    topic_target: /ptz/targets
+    topic_tracker: axis_error
+    zoom_des: 9999.0
+    zoom_search: 600.0
+    zoom_selfie: 1.0
+    zoom_step_high: 1500.0
+    zoom_step_low: 400.0
