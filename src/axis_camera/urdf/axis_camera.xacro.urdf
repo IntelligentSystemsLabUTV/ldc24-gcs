@@ -4,7 +4,7 @@
 
   <!-- LINKS -->
 
-  <link name="world"/>
+  <link name="base_footprint"/>
 
   <link name="chassis">
     <inertial>
@@ -49,9 +49,9 @@
   </link>
 
   <!-- JOINTS -->
-  <joint name="world_to_chassis" type="fixed">
+  <joint name="base_footprint_to_chassis" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 2"/>
-    <parent link="world"/>
+    <parent link="base_footprint"/>
     <child link="chassis"/>
   </joint>
 
