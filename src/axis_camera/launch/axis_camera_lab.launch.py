@@ -22,19 +22,18 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Build config file path
-    # config = os.path.join(
-    #     get_package_share_directory('axis_camera'),
-    #     'config',
-    #     'axis_camera_turin.yaml'
-    # )
-    config = '/home/neo/workspace/src/axis_camera_driver/src/axis_camera/config/axis_camera_lab.yaml'
+    config = os.path.join(
+        get_package_share_directory('axis_camera'),
+        'config',
+        'axis_camera_turin.yaml'
+    )
 
     # Declare launch arguments
     ns = LaunchConfiguration('namespace')
     cf = LaunchConfiguration('cf')
     ns_launch_arg = DeclareLaunchArgument(
         'namespace',
-        default_value='ptz'
+        default_value=''
     )
     cf_launch_arg = DeclareLaunchArgument(
         'cf',
@@ -52,7 +51,11 @@ def generate_launch_description():
         emulate_tty=True,
         output='both',
         log_cmd=True,
-        parameters=[cf]
+        parameters=[cf],
+        remappings=[('/axis_camera/stream', '/axis_camera/stream'),
+                    ('/axis_camera/command', '/axis_camera/command'),
+                    ('/axis_camera/stream_ptzf', '/axis_camera/stream_ptzf'),
+                    ('/axis_camera/ptzf', '/axis_camera/ptzf')],
     )
 
     ld.add_action(node)

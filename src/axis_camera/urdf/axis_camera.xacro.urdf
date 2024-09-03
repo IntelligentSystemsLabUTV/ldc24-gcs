@@ -5,23 +5,21 @@
   <!-- LINKS -->
 
   <link name="world"/>
-  
+
   <link name="chassis">
     <inertial>
       <mass value="1"/>
       <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
     </inertial>
   </link>
-  
-  
+
   <link name="pan_link">
     <inertial>
       <mass value="1"/>
       <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
     </inertial>
   </link>
-  
-  
+
   <link name="tilt_link">
     <visual>
       <geometry>
@@ -29,13 +27,12 @@
       </geometry>
       <origin xyz="0 0 0"/>
     </visual>
-    
+
     <inertial>
       <mass value="1"/>
       <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
     </inertial>
   </link>
-
 
   <link name="camera_link">
     <visual>
@@ -51,16 +48,13 @@
     </inertial>
   </link>
 
-
   <!-- JOINTS -->
-  
   <joint name="world_to_chassis" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 2"/>
     <parent link="world"/>
     <child link="chassis"/>
   </joint>
-  
-  
+
   <joint name="chassis_to_pan" type="revolute">
     <axis xyz="0 0 1"/>
     <origin xyz="0.0 0.0 0.0"/>
@@ -69,8 +63,7 @@
     <limit effort="100000" lower="-600.28" upper="600.28" velocity="30"/>
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
-  
-  
+
   <joint name="pan_to_tilt" type="revolute">
     <axis xyz="0 1 0"/>
     <origin xyz="0.0 0.0 0.0"/>
@@ -79,7 +72,6 @@
     <limit effort="100000" lower="-100.57" upper="100.57" velocity="30"/>
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
-  
 
   <joint name="tilt_to_camera" type="revolute">
     <origin rpy="0 0 0" xyz="0.05 0 0"/>
@@ -89,14 +81,11 @@
     <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
-
   <!-- PLUGINS -->
-
   <gazebo reference="camera_link">
     <gravity>0</gravity>
   </gazebo>
 
-  
   <ros2_control name="GazeboSystem" type="system">
     <hardware>
       <plugin>gazebo_ros2_control/GazeboSystem</plugin>
@@ -110,7 +99,7 @@
       <state_interface name="velocity"/>
     </joint>
   </ros2_control>
-  
+
   <ros2_control name="GazeboSystem" type="system">
     <hardware>
       <plugin>gazebo_ros2_control/GazeboSystem</plugin>
@@ -125,16 +114,14 @@
     </joint>
   </ros2_control>
 
-
   <gazebo>
     <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
       <parameters>$(find axis_camera)/config/axis_camera_controller.yaml</parameters>
     </plugin>
   </gazebo>
 
-
   <gazebo reference="camera_link">
-    <sensor name="axis_camera" type="depth">  <!-- type="camera" -->
+    <sensor name="axis_camera" type="camera">  <!-- type="camera" -->
       <update_rate>50</update_rate>
 
       <camera>
@@ -156,7 +143,7 @@
         <!-- <ros>
           <namespace>custom_ns</namespace>
         </ros> -->
-        
+
         <!-- TAGS NOT WORKING -->
         <!-- <update_rate>0</update_rate>
         <baseline>0.2</baseline>
@@ -182,8 +169,7 @@
         <focalLength>0</focalLength>
         <hackBaseline>0</hackBaseline> -->
       </plugin>
-      
     </sensor>
   </gazebo>
-  
+
 </robot>

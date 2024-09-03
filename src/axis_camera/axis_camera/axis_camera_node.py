@@ -9,7 +9,8 @@ October 29, 2023
 
 import time
 from math import pi
-import dua_qos_py.dua_qos_reliable
+import dua_qos_py.dua_qos_besteffort as dua_qos_besteffort
+import dua_qos_py.dua_qos_reliable as dua_qos_reliable
 import requests
 from imutils.video import VideoStream
 from requests.auth import HTTPDigestAuth
@@ -24,8 +25,6 @@ from geometry_msgs.msg import TransformStamped
 
 from axis_camera_interfaces.msg import ImagePTZF, PTZF
 
-import dua_qos_py
-
 
 class AxisCameraNode(Node):
     """
@@ -36,7 +35,7 @@ class AxisCameraNode(Node):
         """
         Initialize the node.
         """
-        super().__init__('camera_driver')
+        super().__init__('axis_camera_driver')
 
         self.get_namespace()
 
@@ -67,10 +66,6 @@ class AxisCameraNode(Node):
                         ('pan0', 0.0),
                         ('publish_split', True),
                         ('timer_period', 1.0),
-                        ('topic_axis_camera', 'axis_camera_topic'),
-                        ('topic_ptzf', 'ptzf_topic'),
-                        ('topic_image_ptzf', 'image_ptzf_topic'),
-                        ('topic_command', 'command_topic'),
                        ])
 
         self.ip_address = self.get_parameter('ip_address').value
@@ -78,21 +73,13 @@ class AxisCameraNode(Node):
         self.password = self.get_parameter('password').value
         self.pan0 = self.get_parameter('pan0').value
         self.publish_split = self.get_parameter('publish_split').value
-        self.topic_axis_camera = self.get_parameter('topic_axis_camera').value
-        self.topic_ptzf = self.get_parameter('topic_ptzf').value
-        self.topic_image_ptzf = self.get_parameter('topic_image_ptzf').value
         self.timer_period = self.get_parameter('timer_period').value
-        self.topic_command = self.get_parameter('topic_command').value
 
         self.get_logger().info(f'ip_address: {self.ip_address}')
         self.get_logger().info(f'username: {self.username}')
         self.get_logger().info(f'password: {self.password}')
         self.get_logger().info(f'pan0: {self.pan0}°')
         self.get_logger().info(f'publish_split: {self.publish_split}')
-        self.get_logger().info(f'topic_axis_camera: {self.topic_axis_camera}')
-        self.get_logger().info(f'topic_command: {self.topic_command}')
-        self.get_logger().info(f'topic_image_ptzf: {self.topic_image_ptzf}')
-        self.get_logger().info(f'topic_ptzf: {self.topic_ptzf}')
         self.get_logger().info(f'timer_period: {self.timer_period}')
 
     def init_publishers(self):
@@ -101,19 +88,19 @@ class AxisCameraNode(Node):
         """
         self.publisher_ = self.create_publisher(
             ImagePTZF,
-            self.topic_image_ptzf,
-            dua_qos_py.dua_qos_reliable())
+            "~/stream_ptzf",
+            dua_qos_reliable.get_image_qos())
 
         if self.publish_split:
             self.publisher_image = self.create_publisher(
                 Image,
-                self.topic_axis_camera,
-                dua_qos_py.dua_qos_reliable())
+                "~/stream",
+                dua_qos_reliable.get_image_qos())
 
             self.publisher_ptz = self.create_publisher(
                 PTZF,
-                self.topic_ptzf,
-                dua_qos_py.dua_qos_reliable())
+                '~/ptzf',
+                dua_qos_reliable.get_image_qos())
 
     def init_timers(self):
         """
@@ -132,9 +119,9 @@ class AxisCameraNode(Node):
         self.cgroup_sub = MutuallyExclusiveCallbackGroup()
         self.subscriber = self.create_subscription(
             PTZF,
-            self.topic_command,
+            "~/command",
             self.command_callback,
-            dua_qos_py.get_datum_qos(),
+            dua_qos_reliable.get_datum_qos(),
             callback_group=self.cgroup_sub)
 
     def init_tf2(self):
@@ -303,4 +290,3 @@ class AxisCameraNode(Node):
         msg.ptzf = ptzf_msg
 
         self.publisher_.publish(msg)
-

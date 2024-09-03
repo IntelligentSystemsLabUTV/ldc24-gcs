@@ -1,4 +1,4 @@
-/ptz/camera_driver:
+/axis_camera_driver:
   ros__parameters:
     ip_address: '172.16.0.9'
     username: 'root'
@@ -6,7 +6,3 @@
     pan0: 148.92
     publish_split: True
     timer_period: 0.1
-    topic_axis_camera: 'stream'
-    topic_command: 'command'
-    topic_image_ptzf: 'axis_image'
-    topic_ptzf: 'ptzf'

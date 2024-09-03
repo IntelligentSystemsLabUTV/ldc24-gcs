@@ -1,4 +1,4 @@
-/ptz/camera_driver:
+/axis_camera_driver:
   ros__parameters:
     ip_address: '172.16.0.3'
     username: 'root'
