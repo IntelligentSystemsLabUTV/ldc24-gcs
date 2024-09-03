@@ -1,42 +1,39 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.8)
 project(axis_camera_interfaces)
-
-# Default to C99
-if(NOT CMAKE_C_STANDARD)
-  set(CMAKE_C_STANDARD 99)
-endif()
-
-# Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
-endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
+# Find dependencies
+find_package(action_msgs REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(vision_msgs REQUIRED)
+
+set(ACTION_DIR "${CMAKE_CURRENT_SOURCE_DIR}/action")
+file(GLOB ACTION_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${ACTION_DIR}/*.action")
+
+set(SRV_DIR "${CMAKE_CURRENT_SOURCE_DIR}/srv")
+file(GLOB SRV_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${SRV_DIR}/*.srv")
+
+set(MSG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/msg")
+file(GLOB MSG_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${MSG_DIR}/*.msg")
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/ImagePTZF.msg"
-  "msg/ImagePT.msg"
-  "msg/ImageError.msg"
-  "msg/PTZF.msg"
-  DEPENDENCIES sensor_msgs
-)
+  ${ACTION_FILES}
+  ${SRV_FILES}
+  ${MSG_FILES}
+  DEPENDENCIES geometry_msgs sensor_msgs std_msgs vision_msgs)
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+ament_export_dependencies(
+  action_msgs
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+  vision_msgs)
 
 ament_package()

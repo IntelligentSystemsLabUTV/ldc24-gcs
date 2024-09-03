@@ -19,18 +19,14 @@
 # this file; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 
-# Current pan angle
-float32 pan
+float64 pan
 bool pan_global
 
-# Current tilt angle
-float32 tilt
+float64 tilt
 bool tilt_global
 
-# Current zoom angle
-float32 zoom
+float64 zoom
 bool zoom_global
 
-# Current focus
-float32 focus
+float64 focus
 bool focus_global

@@ -22,8 +22,8 @@
 # MESSAGE FIELDS
 # ex: Horizontal error between drone camera and aruco central point (meters).
 # ey: Vertical error between drone camera and aruco central point (meters).
-float32 ex
-float32 ey
+float64 ex
+float64 ey
 
 # Tells if camera needs to zoom
 bool zoom
