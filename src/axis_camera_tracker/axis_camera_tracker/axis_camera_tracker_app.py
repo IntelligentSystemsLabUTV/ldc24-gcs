@@ -1,15 +1,12 @@
 import sys
-
 import rclpy
-
 from rclpy.executors import MultiThreadedExecutor
-
-from axis_camera_tracker.axis_camera_tracker_node import ArucoTrackerNode
+from axis_camera_tracker.axis_camera_tracker_node import AxisCameraTrackerNode
 
 def main():
     rclpy.init(args=sys.argv)
 
-    axis_camera_tracker_node = ArucoTrackerNode()
+    axis_camera_tracker_node = AxisCameraTrackerNode()
 
     executor = MultiThreadedExecutor(num_threads=2)
     executor.add_node(axis_camera_tracker_node)

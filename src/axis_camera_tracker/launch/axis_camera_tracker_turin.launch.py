@@ -22,19 +22,18 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Build config file path
-    # config = os.path.join(
-    #     get_package_share_directory('axis_camera_tracker'),
-    #     'config',
-    #     'axis_camera_tracker.yaml'
-    # )
-    config = '/home/neo/workspace/src/axis_camera_driver/src/axis_camera_tracker/config/axis_camera_tracker_turin.yaml'
+    config = os.path.join(
+        get_package_share_directory('axis_camera_tracker'),
+        'config',
+        'axis_camera_tracker_turin.yaml'
+    )
 
     # Declare launch arguments
     ns = LaunchConfiguration('namespace')
     cf = LaunchConfiguration('cf')
     ns_launch_arg = DeclareLaunchArgument(
         'namespace',
-        default_value='ptz'
+        default_value=''
     )
     cf_launch_arg = DeclareLaunchArgument(
         'cf',
@@ -47,13 +46,24 @@ def generate_launch_description():
     node = Node(
         package='axis_camera_tracker',
         executable='axis_camera_tracker',
-        exec_name='axis_camera_tracker_app',
         namespace=ns,
         shell=False,
         emulate_tty=True,
         output='both',
         log_cmd=True,
-        parameters=[cf]
+        parameters=[cf],
+        remappings=[('/command', '/axis_camera_driver/command'),
+                    ('/visual', '/hmi/found_target_visual'),
+                    ('/axis_camera_tracker/selfie', '/axis_camera_tracker/selfie'),
+                    ('/axis_image', '/axis_camera/axis_image'),
+                    ('/axis_camera_tracker/image', '/axis_camera_tracker/image_color'),
+                    ('/valid_targets', '/valid_targets'),
+                    ('/targets', '/axis_camera/targets'),
+                    ('/axis_error', '/axis_error'),
+                    ('/search_arianna', '/search_arianna'),
+                    ('/search_dottore', '/search_dottore'),
+                    ('/stream_ptzf', '/axis_camera_driver/stream_ptzf'),
+                   ]
     )
 
     ld.add_action(node)
