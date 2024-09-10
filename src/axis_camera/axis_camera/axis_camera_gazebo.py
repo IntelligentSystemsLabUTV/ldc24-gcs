@@ -23,7 +23,7 @@ class AxisCamera(Node):
 
         self.qos_profile = QoSProfile(depth = 0)
         self.qos_profile.history = QoSHistoryPolicy.KEEP_LAST
-        self.qos_profile.reliability = QoSReliabilityPolicy.BEST_EFFORT
+        self.qos_profile.reliability = QoSReliabilityPolicy.RELIABLE
         self.qos_profile.durability = QoSDurabilityPolicy.VOLATILE
 
         self.subscriber_gazebo_image_ = self.create_subscription(Image,
@@ -34,13 +34,13 @@ class AxisCamera(Node):
         self.subscriber_gazebo_image_  # prevent unused variable warning
 
         self.publisher_imagePTZF_ = self.create_publisher(ImagePTZF,
-                                                          'axis_image',
+                                                          '/axis_camera/stream_ptzf',
                                                           self.qos_profile,
                                                           callback_group=self.group)
 
         self.publisher_image_ = self.create_publisher(
             Image,
-            '/axis/image_color',
+            '/axis/stream',
             qos_profile_sensor_data)
 
         self.pan = 0.0
@@ -56,7 +56,7 @@ class AxisCamera(Node):
 
         self.subscriber_command_ = self.create_subscription(
             PTZF,
-            '/ptz/command',
+            '/axis_camera/command',
             self.listener_callback_command,
             0,
             callback_group=self.group)
@@ -73,35 +73,36 @@ class AxisCamera(Node):
             curr_pan = self.pan
             curr_tilt = self.tilt
 
+        pan = tilt = 0.0
         if msg.pan_global:
-            pan = msg.pan
+            pan = -msg.pan
         else:
-            pan = curr_pan + msg.pan
+            pan = curr_pan - msg.pan
         if msg.tilt_global:
-            tilt = msg.tilt
+            tilt = -msg.tilt
         else:
-            tilt = curr_tilt + msg.tilt
+            tilt = curr_tilt - msg.tilt
 
         cmds = Float64MultiArray()
-        cmds.data = [pan, -tilt]
+        cmds.data = [pan*pi/180, tilt*pi/180]
 
         self.publisher_errors_.publish(cmds)
 
     def listener_callback_image(self, msg_image):
-        print(1)
         msg = ImagePTZF()
         msg.image = msg_image
         with self._lock:
-            msg.ptzf.pan = self.pan
-            msg.ptzf.tilt = self.tilt
+            msg.ptzf.pan = -self.pan
+            msg.ptzf.tilt = -self.tilt
+            msg.ptzf.zoom = 9999.0
 
         self.publisher_imagePTZF_.publish(msg)
         self.publisher_image_.publish(msg_image)
 
     def listener_callback_state(self, msg_state):
         with self._lock:
-            self.pan = msg_state.position[0]
-            self.tilt = msg_state.position[1]
+            self.pan = msg_state.position[0]*180/pi
+            self.tilt = msg_state.position[1]*180/pi
 
 
 def main(args=None):

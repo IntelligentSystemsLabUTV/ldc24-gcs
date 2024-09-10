@@ -397,15 +397,6 @@ class AxisCameraTrackerNode(Node):
         """
         Callback after receiving Detection2DArray
         """
-
-        # Create ImagePTZF subscriber
-        self.image_ptzf_sub = self.create_subscription(
-            ImagePTZF,
-            '/stream_ptzf',
-            self.image_ptzf_callback,
-            dua_qos_reliable.get_image_qos())
-        self.started_subscriber = True
-
         json_dict = json.loads(msg.data)
 
         aruco_numbers_uav = json_dict['uav']
@@ -430,6 +421,7 @@ class AxisCameraTrackerNode(Node):
             '/stream_ptzf',
             self.image_ptzf_callback,
             dua_qos_reliable.get_image_qos())
+        self.started_subscriber = True
 
         # Remove start subscriber
         self.destroy_subscription(self.start_sub)

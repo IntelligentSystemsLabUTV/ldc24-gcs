@@ -52,7 +52,7 @@ def generate_launch_description():
         output='both',
         log_cmd=True,
         parameters=[cf],
-        remappings=[('/command', '/axis_camera_driver/command'),
+        remappings=[('/command', '/axis_camera/command'),
                     ('/visual', '/hmi/found_target_visual'),
                     ('/axis_camera_tracker/selfie', '/axis_camera_tracker/selfie'),
                     ('/axis_image', '/axis_camera/axis_image'),
@@ -62,7 +62,7 @@ def generate_launch_description():
                     ('/axis_error', '/axis_error'),
                     ('/search_arianna', '/search_arianna'),
                     ('/search_dottore', '/search_dottore'),
-                    ('/stream_ptzf', '/axis_camera_driver/stream_ptzf'),
+                    ('/stream_ptzf', '/axis_camera/stream_ptzf'),
                    ]
     )
 
