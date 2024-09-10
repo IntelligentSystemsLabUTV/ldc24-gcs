@@ -19,7 +19,7 @@
 # this file; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
 
-geometry_msgs/PointStamped pose
+geometry_msgs/PointStamped point
 ---
 bool success
 string message
