@@ -35,7 +35,7 @@ class AxisCameraNode(Node):
         """
         Initialize the node.
         """
-        super().__init__('axis_camera_driver')
+        super().__init__('axis_camera')
 
         self.get_namespace()
 

@@ -25,7 +25,7 @@ def generate_launch_description():
     config = os.path.join(
         get_package_share_directory('axis_camera'),
         'config',
-        'axis_camera_turin.yaml'
+        'axis_camera_lab.yaml'
     )
 
     # Declare launch arguments
