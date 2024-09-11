@@ -10,10 +10,17 @@
     calibration_file_path: /home/neo/workspace/src/axis_camera_tracker/config/calibration_9999.yaml
     err_thr: 0.1
     err_thr_zoom: 0.1
+    focal_x_m: 1.3832
+    focal_x_x0: 300.0
+    focal_x_y0: 2986.70
+    focal_y_m: 1.4200
+    focal_y_x0: 300.0
+    focal_y_y0: 2989.88
     frame_camera: ptz/camera_link
     frame_fixed: map
     frame_wall: ptz/wall_link
     frames_track_to_search: 500
+    frames_wait_after_selfie: 20
     k_tilt: 0.1
     kpx: 2.0
     kpy: 2.0
@@ -22,6 +29,7 @@
     pan_l: 0.0
     pan_r: 40.0
     pan_step: 0.3
+    pt_path: /home/neo/workspace/logs/yolov8l-seg.pt
     selfie_offset: 0.5
     selfie_save_path: '/home/neo/workspace/logs'
     thr_sharpness: 100.0

@@ -14,6 +14,7 @@ def main():
     try:
         executor.spin()
     finally:
+        axis_camera_tracker_node.thread.join()
         axis_camera_tracker_node.destroy_node()
         executor.shutdown()
 
