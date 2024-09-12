@@ -1,5 +1,5 @@
 """
-Aruco tracker launch file.
+Axis Camera tracker launch file.
 
 Lorenzo Bianchi <lnz.bnc@gmail.com>
 Roberto Masocco <robmasocco@gmail.com>

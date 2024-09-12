@@ -1,16 +1,16 @@
-/ptz/axis_camera_tracker:
+/axis_camera_tracker:
   ros__parameters:
-    aruco_numbers_ugv:
-      - -1
-    aruco_numbers_uav:
-      - -1
-    aruco_selfie: 666
-    aruco_size: 0.095
-    calibration_file_path: /home/neo/workspace/src/axis_camera_driver/src/axis_camera_tracker/config/calibration_9999.yaml
-    classes_targets:
-      - bottle
-      - person
-    err_thr: 0.1
+    # aruco_numbers_ugv:
+    #   - -1
+    # aruco_numbers_uav:
+    #   - -1
+    # aruco_selfie: 666
+    aruco_size: 0.5
+    # calibration_file_path: /home/neo/workspace/src/axis_camera_tracker/config/calibration_9999.yaml
+    # classes_targets:
+    #   - void
+    err_thr_aruco: 1.0
+    err_thr_object: 1.0
     err_thr_zoom: 0.1
     focal_x_m: 1.3832
     focal_x_x0: 300.0
@@ -24,20 +24,22 @@
     frames_track_to_search: 50
     frames_wait_after_selfie: 20
     k_tilt: 0.1
-    kpx: 2.0
-    kpy: 2.0
+    kpx_aruco: 30.0
+    kpy_aruco: 30.0
+    kpx_object: 4.0
+    kpy_object: 4.0
     model_score_threshold: 0.5
     n_loops: 2
     padding: 20
-    pan_l: -110.0      # pan_l < pan_r
-    pan_r: -70.0
-    pan_step: 1.0
-    pt_path: /home/neo/workspace/logs/yolov8l-seg.pt
+    pan_l: -30.0
+    pan_r: 30.0
+    pan_step: 0.5
+    pt_path: /home/neo/workspace/logs/yolov8l.pt
     selfie_offset: 0.5
     selfie_save_path: '/home/neo/workspace/logs'
     thr_sharpness: 100.0
-    thr_time: 10.0
-    tilt_des_down: -30.0  # -45.0
+    thr_time: 1.0
+    tilt_des_down: -35.0
     tilt_des_up: -10.0
     track_aruco_backwards_distance: 1.0
     track_object_forwards_distance: 2.0

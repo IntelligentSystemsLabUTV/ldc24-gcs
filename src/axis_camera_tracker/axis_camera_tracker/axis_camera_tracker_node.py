@@ -1,6 +1,6 @@
 import cv2, yaml, time, json, glob
 import numpy as np
-from math import sin, cos, atan, atan2, floor
+from math import pi, sin, cos, atan, atan2, floor
 from scipy.spatial.transform import Rotation
 from threading import Lock, Thread
 
@@ -24,6 +24,7 @@ from geometry_msgs.msg import PoseStamped
 from axis_camera_interfaces.srv import Selfie
 
 from ultralytics import YOLO
+import torch
 
 
 class AxisCameraTrackerNode(Node):
@@ -40,7 +41,7 @@ class AxisCameraTrackerNode(Node):
         self.init_locks()
         self.init_arucos()
         self.init_tf2()
-        self.init_network()
+        self.init_inference()
         self.init_publishers()
         self.init_subscribers()
         self.init_services()
@@ -81,12 +82,6 @@ class AxisCameraTrackerNode(Node):
         self.get_logger().info('Node initialized')
 
     # Init functions
-    def init_network(self):
-        self.model_coco = YOLO(self.pt_path, verbose=False)
-        # self.model = YOLO('', verbose=False)
-
-        self.target_classes_ids = [i for i in self.model_coco.names if self.model_coco.names[i] in self.classes_targets]
-
     def init_parameters(self):
         """
         Init parameters
@@ -95,11 +90,12 @@ class AxisCameraTrackerNode(Node):
             namespace='',
             parameters=[('aruco_numbers_uav', [1]),
                         ('aruco_numbers_ugv', [1]),
-                        ('aruco_selfie', 0),
+                        # ('aruco_selfie', 0),
                         ('aruco_size', 0.1),
-                        ('calibration_file_path', 'path'),
+                        # ('calibration_file_path', 'path'),
                         ('classes_targets', ['']),
-                        ('err_thr', 0.5),
+                        ('err_thr_aruco', 0.5),
+                        ('err_thr_object', 0.5),
                         ('err_thr_zoom', 0.5),
                         ('focal_x_m', 0.0),
                         ('focal_x_x0', 0.0),
@@ -112,8 +108,10 @@ class AxisCameraTrackerNode(Node):
                         ('frame_wall', 'fixed_footprint'),
                         ('frames_track_to_search', 1),
                         ('frames_wait_after_selfie', 1),
-                        ('kpx', 1.0),
-                        ('kpy', 1.0),
+                        ('kpx_aruco', 1.0),
+                        ('kpy_aruco', 1.0),
+                        ('kpx_object', 1.0),
+                        ('kpy_object', 1.0),
                         ('k_tilt', 1.0),
                         ('max_distance', 1.0),
                         ('model_score_threshold', 0.1),
@@ -141,10 +139,11 @@ class AxisCameraTrackerNode(Node):
                         ('zoom_step_low', 1.0),
                        ])
 
-        self.aruco_selfie = self.get_parameter('aruco_selfie').value
+        # self.aruco_selfie = self.get_parameter('aruco_selfie').value
         self.aruco_size = self.get_parameter('aruco_size').value
-        self.calibration_file_path = self.get_parameter('calibration_file_path').value
-        self.err_thr = self.get_parameter('err_thr').value
+        # self.calibration_file_path = self.get_parameter('calibration_file_path').value
+        self.err_thr_aruco = self.get_parameter('err_thr_aruco').value
+        self.err_thr_object = self.get_parameter('err_thr_object').value
         self.err_thr_zoom = self.get_parameter('err_thr_zoom').value
         self.focal_x_m = self.get_parameter('focal_x_m').value
         self.focal_x_x0 = self.get_parameter('focal_x_x0').value
@@ -158,8 +157,10 @@ class AxisCameraTrackerNode(Node):
         self.frames_track_to_search = self.get_parameter('frames_track_to_search').value
         self.frames_wait_after_selfie = self.get_parameter('frames_wait_after_selfie').value
         self.k_tilt = self.get_parameter('k_tilt').value
-        self.kpx = self.get_parameter('kpx').value
-        self.kpy = self.get_parameter('kpy').value
+        self.kpx_aruco = self.get_parameter('kpx_aruco').value
+        self.kpy_aruco = self.get_parameter('kpy_aruco').value
+        self.kpx_object = self.get_parameter('kpx_object').value
+        self.kpy_object = self.get_parameter('kpy_object').value
         self.max_distance = self.get_parameter('max_distance').value
         self.model_score_threshold = self.get_parameter('model_score_threshold').value
         self.n_loops = self.get_parameter('n_loops').value
@@ -185,10 +186,11 @@ class AxisCameraTrackerNode(Node):
         self.zoom_step_low = self.get_parameter('zoom_step_low').value
         self.zoom_step_high = self.get_parameter('zoom_step_high').value
 
-        self.get_logger().info(f'aruco_size: {self.aruco_selfie}')
+        # self.get_logger().info(f'aruco_size: {self.aruco_selfie}')
         self.get_logger().info(f'aruco_size: {self.aruco_size}')
-        self.get_logger().info(f'calibration_file_path: {self.calibration_file_path}')
-        self.get_logger().info(f'err_thr: {self.err_thr}')
+        # self.get_logger().info(f'calibration_file_path: {self.calibration_file_path}')
+        self.get_logger().info(f'err_thr_aruco: {self.err_thr_aruco}')
+        self.get_logger().info(f'err_thr_object: {self.err_thr_object}')
         self.get_logger().info(f'err_thr_zoom: {self.err_thr_zoom}')
         self.get_logger().info(f'focal_x_m: {self.focal_x_m}')
         self.get_logger().info(f'focal_x_x0: {self.focal_x_x0}')
@@ -202,8 +204,10 @@ class AxisCameraTrackerNode(Node):
         self.get_logger().info(f'frames_track_to_search: {self.frames_track_to_search}')
         self.get_logger().info(f'frames_wait_after_selfie: {self.frames_wait_after_selfie}')
         self.get_logger().info(f'k_tilt: {self.k_tilt}')
-        self.get_logger().info(f'kpx: {self.kpx}')
-        self.get_logger().info(f'kpy: {self.kpy}')
+        self.get_logger().info(f'kpx_aruco: {self.kpx_aruco}')
+        self.get_logger().info(f'kpy_aruco: {self.kpy_aruco}')
+        self.get_logger().info(f'kpx_object: {self.kpx_object}')
+        self.get_logger().info(f'kpy_object: {self.kpy_object}')
         self.get_logger().info(f'max_distance: {self.max_distance}')
         self.get_logger().info(f'model_score_threshold: {self.model_score_threshold}')
         self.get_logger().info(f'n_loops: {self.n_loops}')
@@ -234,10 +238,10 @@ class AxisCameraTrackerNode(Node):
         Init calibration matrix and vector
         """
         # Get matrices from calibration file
-        with open(self.calibration_file_path, 'r') as file:
-            data = yaml.safe_load(file)
-        self.camera_matrix = np.array(data['camera_matrix']['data'], dtype=np.float32).reshape((3,3))
-        self.dist_coeffs = np.array(data['distortion_coefficients']['data'], dtype=np.float32)
+        # with open(self.calibration_file_path, 'r') as file:
+        #     data = yaml.safe_load(file)
+        # self.camera_matrix = np.array(data['camera_matrix']['data'], dtype=np.float32).reshape((3,3))
+        # self.dist_coeffs = np.array(data['distortion_coefficients']['data'], dtype=np.float32)
 
         # Set points for PnP function
         self.objPoints = np.array([
@@ -332,6 +336,13 @@ class AxisCameraTrackerNode(Node):
         self.status_lock = Lock()
         self.ptzf_lock = Lock()
 
+    def init_inference(self):
+        # torch.cuda.set_device(0)
+        self.model_coco = YOLO(self.pt_path,
+                               verbose=True,
+                               task='detect')
+        # self.model = YOLO('', verbose=False)
+
     # Callbacks
     def selfie_callback(self, request, response):
         """
@@ -345,6 +356,7 @@ class AxisCameraTrackerNode(Node):
             return response
 
         with self.status_lock:
+            self.get_logger().warn('Transition to state SELFIE')
             self.status = self.SELFIE
 
         time.sleep(2)
@@ -395,6 +407,7 @@ class AxisCameraTrackerNode(Node):
 
         if self.n_loops * 2 > self.n_segments:
             with self.status_lock:
+                self.get_logger().warn('Transition to state SEARCH')
                 self.status = self.SEARCH
 
         self.wait_after_selfie = 0
@@ -414,7 +427,6 @@ class AxisCameraTrackerNode(Node):
             results = self.model(img, verbose=False, conf=0.5)
             print(results)
 
-
     def image_ptzf_callback(self, msg):
         """
         Callback for ImagePTZF subscriber
@@ -432,6 +444,7 @@ class AxisCameraTrackerNode(Node):
 
         with self.image_lock:
             self.frame = self.bridge.imgmsg_to_cv2(msg.image)
+            self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
 
         with self.status_lock:
             status = self.status
@@ -454,6 +467,7 @@ class AxisCameraTrackerNode(Node):
 
         aruco_numbers_uav = json_dict['uav']
         aruco_numbers_ugv = json_dict['ugv']
+        classes_targets = json_dict['classes']
 
         self.set_parameters([rclpy.parameter.Parameter(
             'aruco_numbers_uav',
@@ -465,8 +479,14 @@ class AxisCameraTrackerNode(Node):
             rclpy.Parameter.Type.INTEGER_ARRAY,
             aruco_numbers_ugv)])
 
+        self.set_parameters([rclpy.parameter.Parameter(
+            'classes_targets',
+            rclpy.Parameter.Type.STRING_ARRAY,
+            classes_targets)])
+
         self.get_logger().info(f'aruco_numbers_uav: {aruco_numbers_uav}')
         self.get_logger().info(f'aruco_numbers_ugv: {aruco_numbers_ugv}')
+        self.get_logger().info(f'classes_targets: {classes_targets}')
 
         # Create ImagePTZF subscriber
         self.image_ptzf_sub = self.create_subscription(
@@ -519,7 +539,12 @@ class AxisCameraTrackerNode(Node):
         Get classes names from parameter server
         """
         classes_targets = self.get_parameter('classes_targets').value
-        classes_targets_ids = [i for i in self.model_coco.names if self.model_coco.names[i] in classes_targets]
+        classes_targets_ids = []
+        names = self.model_coco.names
+        for i in range(len(names)):
+            names[i] = names[i].replace(' ', '_')
+            if names[i] in classes_targets and i not in self.found_objects:
+                classes_targets_ids.append(i)
 
         return classes_targets_ids
 
@@ -557,6 +582,15 @@ class AxisCameraTrackerNode(Node):
 
         return isometry
 
+    def inference(self, frame):
+        nn_results = self.model_coco(frame,
+                                    #  device='cuda',
+                                     stream=False,
+                                     verbose=False,
+                                     conf=self.model_score_threshold,
+                                     classes=self.get_classes_ids())
+        return nn_results
+
     # Routines
     def search(self, frame):
         """
@@ -567,21 +601,20 @@ class AxisCameraTrackerNode(Node):
                 return
 
         # Detect targets in the input frame
-        nn_results = self.model_coco(frame,
-                                     stream=True,
-                                     verbose=False,
-                                     conf=self.model_score_threshold,
-                                     classes=self.get_classes_ids())
+        nn_results = self.inference(frame)
 
         for nn_result in nn_results:
-            detections = len(nn_result)
+            if len(nn_result) > 0:
+                self.last_pan, self.last_tilt, self.zoom_search, _ = self.get_ptzf()
 
-            if detections > 0:
                 with self.status_lock:
                     if self.status != self.SELFIE:
-                        self.status = self.TRACK
+                        self.get_logger().warn('Transition to state TRACK_OBJECT')
+                        self.status = self.TRACK_OBJECT
                     else:
                         return
+                self.target_object_class_id = int(nn_result.boxes[0].cls[0])
+                self.counter = 0
                 self.track_object(frame)
                 return
 
@@ -592,7 +625,6 @@ class AxisCameraTrackerNode(Node):
             parameters=self.arucoParams)
 
         if len(corners) > 0:
-            self.counter = 0
             ids = ids.flatten()
             for markerID in ids:
                 aruco_numbers_uav, aruco_numbers_ugv = self.get_aruco_numbers()
@@ -600,13 +632,16 @@ class AxisCameraTrackerNode(Node):
                 if (markerID in aruco_numbers_uav or markerID in aruco_numbers_ugv) and \
                     markerID not in self.found_arucos:
 
-                    self.last_pan, self.last_tilt, _, _ = self.get_ptzf()
+                    self.last_pan, self.last_tilt, self.zoom_search, _ = self.get_ptzf()
 
                     with self.status_lock:
                         if self.status != self.SELFIE:
-                            self.status = self.TRACK
+                            self.get_logger().warn('Transition to state TRACK_ARUCO')
+                            self.status = self.TRACK_ARUCO
                         else:
                             return
+                    self.target_aruco_id = markerID
+                    self.counter = 0
                     self.track_aruco(frame)
                     return
 
@@ -649,7 +684,7 @@ class AxisCameraTrackerNode(Node):
         """
         Tracking routine for Aruco markers
         """
-        print('Tracking Aruco')
+        self.get_logger().info(f'Tracking Aruco {self.target_aruco_id}')
         frame_orig = frame.copy()
 
         _, _, zoom, _ = self.get_ptzf()
@@ -659,6 +694,7 @@ class AxisCameraTrackerNode(Node):
         if self.counter > self.frames_track_to_search:
             with self.status_lock:
                 if self.status != self.SELFIE:
+                    self.get_logger().warn('Transition to state SEARCH')
                     self.status = self.SEARCH
                     self.first_time = True
                 else:
@@ -688,166 +724,181 @@ class AxisCameraTrackerNode(Node):
             for (markerCorner, markerID) in zip(corners, ids):
                 aruco_numbers_uav, aruco_numbers_ugv = self.get_aruco_numbers()
 
-                if (markerID in aruco_numbers_uav or markerID in aruco_numbers_ugv) and \
-                    markerID not in self.found_arucos:
+                if self.target_aruco_id != markerID:
+                    continue
 
-                    back_to_search = False
-                    markerCorner_42 = markerCorner.reshape((4, 2))
-                    (topLeft, topRight, bottomRight, bottomLeft) = markerCorner_42
+                back_to_search = False
+                markerCorner_42 = markerCorner.reshape((4, 2))
+                (topLeft, topRight, bottomRight, bottomLeft) = markerCorner_42
 
-                    topRight = (int(topRight[0]), int(topRight[1]))
-                    bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
-                    bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
-                    topLeft = (int(topLeft[0]), int(topLeft[1]))
+                topRight = (int(topRight[0]), int(topRight[1]))
+                bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
+                bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
+                topLeft = (int(topLeft[0]), int(topLeft[1]))
 
-                    cv2.line(frame, topLeft, topRight, (0, 255, 0), 2)
-                    cv2.line(frame, topRight, bottomRight, (0, 255, 0), 2)
-                    cv2.line(frame, bottomRight, bottomLeft, (0, 255, 0), 2)
-                    cv2.line(frame, bottomLeft, topLeft, (0, 255, 0), 2)
+                cv2.line(frame, topLeft, topRight, (0, 255, 0), 2)
+                cv2.line(frame, topRight, bottomRight, (0, 255, 0), 2)
+                cv2.line(frame, bottomRight, bottomLeft, (0, 255, 0), 2)
+                cv2.line(frame, bottomLeft, topLeft, (0, 255, 0), 2)
 
-                    cX = int((topLeft[0] + bottomRight[0]) / 2.0)
-                    cY = int((topLeft[1] + bottomRight[1]) / 2.0)
-                    cv2.circle(frame, (cX, cY), 4, (0, 0, 255), -1)
+                cX = int((topLeft[0] + bottomRight[0]) / 2.0)
+                cY = int((topLeft[1] + bottomRight[1]) / 2.0)
+                cv2.circle(frame, (cX, cY), 4, (0, 0, 255), -1)
 
-                    cv2.putText(frame, str(markerID), (topLeft[0], topLeft[1] - 15),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(frame, str(markerID), (topLeft[0], topLeft[1] - 15),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                    command_msg = PTZF()
+                command_msg = PTZF()
 
-                    cX -= img_w/2
-                    cY -= img_h/2
+                cX -= img_w/2
+                cY -= img_h/2
 
-                    time.sleep(0.3)
+                time.sleep(0.3)
 
-                    exp = 2
-                    f = 1 + 9 * ((zoom-1)/9998) ** (1/exp)
-                    fov_h = 2*2*atan(6.058/2/f)
-                    fov_v = 2*2*atan(4.415/2/f)
+                exp = 2
+                f = 1 + 9 * ((zoom-1)/9998) ** (1/exp)
+                fov_h = 2*2*atan(6.058/2/f)
+                fov_v = 2*2*atan(4.415/2/f)
 
-                    # Move camera
-                    scale_factor = 1
-                    if zoom > self.zoom_des/2:  # 5000
-                        scale_factor = 3
+                # Move camera
+                scale_factor = 1
+                if zoom > self.zoom_des/2:  # 5000
+                    scale_factor = 3
 
-                    ex =  fov_h*cX/img_w*self.kpx/scale_factor
-                    ey = -fov_v*cY/img_h*self.kpy/scale_factor
+                ex =  fov_h * cX / img_w * self.kpx_aruco / scale_factor
+                ey = -fov_v * cY / img_h * self.kpy_aruco / scale_factor
 
-                    command_msg.pan_global = False
-                    command_msg.pan = ex
-                    command_msg.tilt_global = False
-                    command_msg.tilt = ey
+                command_msg.pan_global = False
+                command_msg.pan = ex
+                command_msg.tilt_global = False
+                command_msg.tilt = ey
 
-                    if (zoom < 0.8*self.zoom_des):
-                        command_msg.zoom_global = False
-                        if (abs(ex) < self.err_thr_zoom and abs(ey) < self.err_thr_zoom):
-                            command_msg.zoom = self.zoom_step_high
-                        else:
-                            command_msg.zoom = self.zoom_step_low
+                if (zoom < 0.8*self.zoom_des):
+                    command_msg.zoom_global = False
+                    if (abs(ex) < self.err_thr_zoom and abs(ey) < self.err_thr_zoom):
+                        command_msg.zoom = self.zoom_step_high
                     else:
-                        command_msg.zoom_global = True
-                        command_msg.zoom = self.zoom_des+10
+                        command_msg.zoom = self.zoom_step_low
+                else:
+                    command_msg.zoom_global = True
+                    command_msg.zoom = self.zoom_des+10
 
-                    self.command_pub.publish(command_msg)
+                self.command_pub.publish(command_msg)
 
-                    if (abs(zoom-self.zoom_des) < 100 and
-                        abs(ex) < self.err_thr and abs(ey) < self.err_thr):
+                if (abs(zoom-self.zoom_des) < 100 and
+                    abs(ex) < self.err_thr_aruco and abs(ey) < self.err_thr_aruco):
 
-                        if self.first_time:
-                            self.first_time = False
-                            self.t0 = time.time()
+                    if self.first_time:
+                        self.first_time = False
+                        self.t0 = time.time()
 
-                        # Check focus
-                        min_x = min(topLeft[0], bottomLeft[0], topRight[0], bottomRight[0]) - self.padding
-                        max_x = max(topLeft[0], bottomLeft[0], topRight[0], bottomRight[0]) + self.padding
-                        min_y = min(topLeft[1], bottomLeft[1], topRight[1], bottomRight[1]) - self.padding
-                        max_y = max(topLeft[1], bottomLeft[1], topRight[1], bottomRight[1]) + self.padding
+                    # Check focus
+                    min_x = min(topLeft[0], bottomLeft[0], topRight[0], bottomRight[0]) - self.padding
+                    max_x = max(topLeft[0], bottomLeft[0], topRight[0], bottomRight[0]) + self.padding
+                    min_y = min(topLeft[1], bottomLeft[1], topRight[1], bottomRight[1]) - self.padding
+                    max_y = max(topLeft[1], bottomLeft[1], topRight[1], bottomRight[1]) + self.padding
 
-                        min_x = max(0, min_x)
-                        max_x = min(img_w, max_x)
-                        min_y = max(0, min_y)
-                        max_y = min(img_h, max_y)
+                    min_x = max(0, min_x)
+                    max_x = min(img_w, max_x)
+                    min_y = max(0, min_y)
+                    max_y = min(img_h, max_y)
 
-                        # Get rectangle around aruco
-                        gray = cv2.cvtColor(frame_orig[min_y:max_y, min_x:max_x], cv2.COLOR_BGR2GRAY)
-                        #show gray image
-                        # cv2.imshow('gray', gray)
-                        # cv2.waitKey(1)
+                    # Get rectangle around aruco
+                    gray = cv2.cvtColor(frame_orig[min_y:max_y, min_x:max_x], cv2.COLOR_BGR2GRAY)
+                    #show gray image
+                    # cv2.imshow('gray', gray)
+                    # cv2.waitKey(1)
 
-                        # Compute sharpness
-                        sharpness = cv2.Laplacian(gray, cv2.CV_64F).var()
+                    # Compute sharpness
+                    sharpness = cv2.Laplacian(gray, cv2.CV_64F).var()
 
-                        if (sharpness < self.thr_sharpness) and (time.time() - self.t0 < self.thr_time):
+                    if (sharpness < self.thr_sharpness) and (time.time() - self.t0 < self.thr_time):
+                        return
+
+                    self.get_logger().info(f'Found aruco {markerID}')
+
+                    # Aruco is valid, publish data
+                    # Get aruco's relative pose
+                    camera_matrix = np.eye(3)
+                    camera_matrix[0, 0] = self.get_focal(zoom, 'x')
+                    camera_matrix[1, 1] = self.get_focal(zoom, 'y')
+                    camera_matrix[0, 2] = img_w / 2
+                    camera_matrix[1, 2] = img_h / 2
+                    _, rvecs, vec_aruco = cv2.solvePnP(
+                        self.objPoints,
+                        markerCorner,
+                        camera_matrix,
+                        np.array([]),
+                        flags = cv2.SOLVEPNP_IPPE_SQUARE
+                    )
+
+                    rot_aruco, _ = cv2.Rodrigues(rvecs)
+                    iso_cam_aruco = np.eye(4)
+                    iso_cam_aruco[:3, :3] = rot_aruco
+                    iso_cam_aruco[:3, 3] = vec_aruco[:, 0]
+
+                    self.iso_wall_cam = self.get_transform(self.frame_wall, self.frame_camera)
+                    print('iso_wall_cam')
+                    print(self.iso_wall_cam)
+
+                    # Get camera's absolute pose
+                    iso_global = np.matmul(self.iso_wall_cam, iso_cam_aruco)
+                    print('iso_global')
+                    print(iso_global)
+
+                    aruco_position = np.array([iso_global[0, 3],
+                                               iso_global[1, 3],
+                                               0.0])
+                    print('aruco_position')
+                    print(aruco_position)
+                    aruco_xy_dist = np.linalg.norm(aruco_position)
+                    if aruco_xy_dist > 2 * self.track_aruco_backwards_distance:
+                        aruco_position *= (aruco_xy_dist - self.track_aruco_backwards_distance) / aruco_xy_dist
+                    else:
+                        aruco_position *= 0.8
+
+                    aruco_angle = atan2(aruco_position[1], aruco_position[0])
+                    print('aruco_angle')
+                    print(aruco_angle)
+
+                    # Send pose to robots
+                    point = PoseStamped()
+                    point.header.stamp = self.get_clock().now().to_msg()
+                    point.header.frame_id = self.frame_wall
+                    point.pose.position.x = aruco_position[0]
+                    point.pose.position.y = aruco_position[1]
+                    point.pose.position.z = 0.0                         # FIXME
+                    q = Rotation.from_euler('z', aruco_angle).as_quat()
+                    point.pose.orientation.x = q[0]
+                    point.pose.orientation.y = q[1]
+                    point.pose.orientation.z = q[2]
+                    point.pose.orientation.w = q[3]
+
+                    if markerID in aruco_numbers_uav:
+                        self.get_logger().info(f'Sending arianna to search')
+                        self.publisher_target_arianna.publish(point)
+                    if markerID in aruco_numbers_ugv:
+                        self.get_logger().info(f'Sending dottore to search')
+                        self.publisher_target_dottore.publish(point)
+
+                    self.found_arucos.append(markerID)
+
+                    frame = cv2.aruco.drawDetectedMarkers(frame, (markerCorner,))
+                    cv2.drawFrameAxes(frame, camera_matrix, np.array([]), rot_aruco, vec_aruco, 0.1)
+
+                    with self.status_lock:
+                        if self.status != self.SELFIE:
+                            self.get_logger().warn('Transition to state SEARCH')
+                            self.status = self.SEARCH
+                        else:
                             return
 
-                        self.get_logger().info(f'Found aruco {markerID}')
-
-                        # Aruco is valid, publish data
-                        # Get aruco's relative pose
-                        _, rvecs, vec_aruco = cv2.solvePnP(
-                            self.objPoints,
-                            markerCorner,
-                            self.camera_matrix,
-                            self.dist_coeffs,
-                            flags = cv2.SOLVEPNP_IPPE_SQUARE
-                        )
-
-                        rot_aruco, _ = cv2.Rodrigues(rvecs)
-                        iso_cam_aruco = np.eye(4)
-                        iso_cam_aruco[:3, :3] = rot_aruco
-                        iso_cam_aruco[:3, 3] = vec_aruco[:, 0]
-
-                        self.iso_wall_cam = self.get_transform(self.frame_wall, self.frame_camera)
-
-                        # Get camera's absolute pose
-                        iso_global = np.matmul(self.iso_wall_cam, iso_cam_aruco)
-
-                        aruco_position = np.array([iso_global[0, 3],
-                                                   iso_global[1, 3],
-                                                   0.0])
-                        aruco_xy_dist = np.linalg.norm(aruco_position)
-                        if aruco_xy_dist > 2 * self.track_aruco_backwards_distance:
-                            aruco_position *= (aruco_xy_dist - self.track_aruco_backwards_distance) / aruco_xy_dist
-                        else:
-                            aruco_position *= 0.8
-
-                        aruco_angle = atan2(aruco_position[1], aruco_position[0])
-
-                        # Send pose to robots
-                        point = PoseStamped()
-                        point.header.stamp = self.get_clock().now().to_msg()
-                        point.header.frame_id = self.frame_wall
-                        point.pose.position.x = aruco_position[0]
-                        point.pose.position.y = aruco_position[1]
-                        point.pose.position.z = 0.0                         # FIXME
-                        q = Rotation.from_euler('z', aruco_angle).as_quat()
-                        point.pose.orientation.x = q[0]
-                        point.pose.orientation.y = q[1]
-                        point.pose.orientation.z = q[2]
-                        point.pose.orientation.w = q[3]
-
-                        if markerID in aruco_numbers_uav:
-                            self.get_logger().info(f'Sending arianna to search')
-                            self.publisher_target_arianna.publish(point)
-                        if markerID in aruco_numbers_ugv:
-                            self.get_logger().info(f'Sending dottore to search')
-                            self.publisher_target_dottore.publish(point)
-
-                        self.found_arucos.append(markerID)
-
-                        frame = cv2.aruco.drawDetectedMarkers(frame, (markerCorner,))
-                        cv2.drawFrameAxes(frame, self.camera_matrix, self.dist_coeffs, rot_aruco, vec_aruco, 0.1)
-
-                        with self.status_lock:
-                            if self.status != self.SELFIE:
-                                self.status = self.SEARCH
-                            else:
-                                return
-
-                        self.first_time = True
-                        self.reset_zoom()
+                    self.first_time = True
+                    self.reset_zoom()
 
             if back_to_search:
                 with self.status_lock:
+                    self.get_logger().warn('Transition to state SEARCH')
                     self.status = self.SEARCH
 
             # Publish image with ArUco markers
@@ -861,14 +912,15 @@ class AxisCameraTrackerNode(Node):
         """
         Tracking routine for COCO objects
         """
-        print('Tracking object')
-        pan, tilt, zoom, _ = self.get_ptzf()
+        self.get_logger().info(f'Tracking object {self.model_coco.names[self.target_object_class_id]}')
+        pan, _, zoom, _ = self.get_ptzf()
 
         self.counter += 1
         # If no object is found for a while, go back to search
         if self.counter > self.frames_track_to_search:
             with self.status_lock:
                 if self.status != self.SELFIE:
+                    self.get_logger().warn('Transition to state SEARCH')
                     self.status = self.SEARCH
                     self.first_time = True
                 else:
@@ -880,26 +932,25 @@ class AxisCameraTrackerNode(Node):
         img_h = frame.shape[0]
 
         # Detect targets in the input frame
-        classes_ids = self.get_classes_ids()
-        classes_ids = [id_ for id_ in classes_ids if id_ not in self.found_objects]
-        nn_results = self.model_coco(frame,
-                                     stream=True,
-                                     verbose=False,
-                                     conf=self.model_score_threshold,
-                                     classes=classes_ids)
+        nn_results = self.inference(frame)
 
+        print(1)
         for nn_result in nn_results:
             detections = len(nn_result)
+            print(f'Detections: {detections}')
 
             if detections > 0:
-                self.counter = 0
-
                 for i in range(detections):
                     box = nn_result.boxes[i]
                     conf = box.conf[0].cpu().item()
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                     cls = int(box.cls[0])
                     label = f'{self.model_coco.names[cls]} {conf:.2f}'
+
+                    if cls != self.target_object_class_id:
+                        continue
+
+                    self.counter = 0
 
                     # Draw bbox and label
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -914,8 +965,8 @@ class AxisCameraTrackerNode(Node):
                     fov_v = 2*2*atan(4.415/2/f)
 
                     # Move camera
-                    ex =  fov_h*cX/img_w*self.kpx
-                    ey = -fov_v*cY/img_h*self.kpy
+                    ex =  fov_h * cX / img_w * 4 * self.kpx_object
+                    ey = -fov_v * cY / img_h * 4 * self.kpy_object
 
                     command_msg = PTZF()
                     command_msg.pan_global = False
@@ -926,17 +977,19 @@ class AxisCameraTrackerNode(Node):
 
                     time.sleep(0.3)
 
-                    if abs(ex) < self.err_thr:
-                        self.get_logger().info(f'Found object with id {cls}')
+                    if abs(ex) < self.err_thr_object:
+                        self.get_logger().info(f'Found target {self.model_coco.names[cls]}')
+
+                        pan = -pan*pi/180.0             # FIXME: -pan?
 
                         # Send pose to robots
                         point = PoseStamped()
                         point.header.stamp = self.get_clock().now().to_msg()
                         point.header.frame_id = self.frame_wall
-                        point.pose.position.x = self.track_object_forwards_distance * cos(-pan)
-                        point.pose.position.y = self.track_object_forwards_distance * sin(-pan)
+                        point.pose.position.x = self.track_object_forwards_distance * cos(pan)
+                        point.pose.position.y = self.track_object_forwards_distance * sin(pan)
                         point.pose.position.z = 0.0                      # FIXME
-                        q = Rotation.from_euler('z', -pan).as_quat()     # FIXME: -pan?
+                        q = Rotation.from_euler('z', pan).as_quat()
                         point.pose.orientation.x = q[0]
                         point.pose.orientation.y = q[1]
                         point.pose.orientation.z = q[2]
@@ -950,18 +1003,19 @@ class AxisCameraTrackerNode(Node):
 
                         with self.status_lock:
                             if self.status != self.SELFIE:
+                                self.get_logger().warn('Transition to state SEARCH')
                                 self.status = self.SEARCH
                             else:
                                 return
 
                         self.reset_zoom()
 
-                # Publish image with ArUco markers
-                msg_imageCV = Image()
-                msg_imageCV = self.bridge.cv2_to_imgmsg(frame, 'bgr8')
-                msg_imageCV.header.stamp = self.get_clock().now().to_msg()
+        # Publish image with ArUco markers
+        msg_imageCV = Image()
+        msg_imageCV = self.bridge.cv2_to_imgmsg(frame, 'bgr8')
+        msg_imageCV.header.stamp = self.get_clock().now().to_msg()
 
-                self.target_img_pub.publish(msg_imageCV)
+        self.target_img_pub.publish(msg_imageCV)
 
     def get_focal(self, zoom, axis):
         if axis == 'x':
