@@ -170,7 +170,166 @@ def followme_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('FOLLOW_ME')
-    pass
+    node.followme = False
+    node.followme_done = True
+    on_req: SetBool.Request = SetBool.Request(data=True)
+    off_req: SetBool.Request = SetBool.Request(data=False)
+    delta_y = node.followme_waypoints[1][1] - node.followme_waypoints[0][1]
+    delta_x = node.followme_waypoints[1][0] - node.followme_waypoints[0][0]
+    start_heading = math.atan2(delta_y, delta_x)
+
+    # Get control of agents
+    while True:
+        res1: SetBool.Response = node.arianna_followme_client.call_sync(on_req)
+        if res1.success:
+            break
+        time.sleep(0.2)
+    node.get_logger().info('UAV in FOLLOW_ME')
+    while True:
+        res2: SetBool.Response = node.dottorcane_followme_client.call_sync(on_req)
+        if res2.success:
+            break
+        time.sleep(0.2)
+    node.get_logger().info('UGV in FOLLOW_ME')
+
+    # Send agents to FollowMe start point
+    arianna_nav_goal = Navigate.Goal(
+        header=Header(
+            stamp=node.get_clock().now().to_msg(),
+            frame_id='map'
+        ),
+        target=Point(
+            x=node.followme_waypoints[0][0],
+            y=node.followme_waypoints[0][1],
+            z=2.0
+        ),
+        heading=start_heading
+    )
+    dottorcane_nav_goal = Navigate.Goal(
+        header=Header(
+            stamp=node.get_clock().now().to_msg(),
+            frame_id='map'
+        ),
+        target=Point(
+            x=node.followme_waypoints[0][0],
+            y=node.followme_waypoints[0][1],
+            z=0.33
+        ),
+        heading=start_heading
+    )
+    arianna_goal_handle = node.arianna_navigate_client.send_goal_sync(arianna_nav_goal)
+    dottorcane_goal_handle = node.dottorcane_navigate_client.send_goal_sync(dottorcane_nav_goal)
+    if arianna_goal_handle is None or dottorcane_goal_handle is None:
+        node.get_logger().error('Failed to send FollowMe start goals')
+        # Give back control of agents
+        while True:
+            res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+            if res1.success:
+                break
+            time.sleep(0.2)
+        while True:
+            res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+            if res2.success:
+                break
+            time.sleep(0.2)
+        node.get_logger().info('Agents back in control')
+        node.log('FollowMe aborted')
+        return 'followme_done'
+    node.get_logger().info('FollowMe start goals sent')
+
+    # Wait for agents to get to starting point
+    dottorcane_res: Navigate.Result = node.dottorcane_navigate_client.get_result_sync(dottorcane_goal_handle)
+    arianna_res: Navigate.Result = node.arianna_navigate_client.get_result_sync(arianna_goal_handle)
+    if dottorcane_res.result.result != CommandResultStamped.SUCCESS or arianna_res.result.result != CommandResultStamped.SUCCESS:
+        node.get_logger().error('Error executing FollowMe')
+        # Give back control of agents
+        while True:
+            res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+            if res1.success:
+                break
+            time.sleep(0.2)
+        while True:
+            res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+            if res2.success:
+                break
+            time.sleep(0.2)
+        node.get_logger().info('Agents back in control')
+        node.log('FollowMe aborted')
+        return 'followme_done'
+    node.get_logger().info('Agents at FollowMe start point')
+
+    # Start UAV collimation over target
+    collimator_goal = PrecisionLanding.Goal(
+        altitude=2.0,
+        land=False,
+        align=True
+    )
+    collimator_goal_handle = node.arianna_collimate_client.send_goal_sync(collimator_goal)
+    if collimator_goal_handle is None:
+        node.get_logger().error('Error sending collimator goal')
+        # Give back control of agents
+        while True:
+            res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+            if res1.success:
+                break
+            time.sleep(0.2)
+        while True:
+            res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+            if res2.success:
+                break
+            time.sleep(0.2)
+        node.get_logger().info('Agents back in control')
+        node.log('FollowMe aborted')
+        return 'followme_done'
+    node.get_logger().info('UAV collimation started')
+
+    # Pre-set UGV gains
+    node.set_followme_parameters(True)
+
+    # Wait for UAV stabilization over target
+    time.sleep(5.0)
+    node.log('FollowMe started')
+
+    # Send UGV
+    for i in range(1, len(node.followme_waypoints)):
+        node.get_logger().info(f'Going to waypoint ({i+1})')
+        nav_goal = Navigate.Goal(
+            header=Header(
+                stamp=node.get_clock().now().to_msg(),
+                frame_id='map'
+            ),
+            target=Point(
+                x=node.followme_waypoints[i][0],
+                y=node.followme_waypoints[i][1],
+                z=0.33
+            )
+        )
+        node.dottorcane_navigate_client.call(nav_goal)
+        time.sleep(2.0)
+
+    # Stop collimation
+    node.arianna_collimate_client.cancel_sync(collimator_goal_handle)
+    node.arianna_collimate_client.get_result_sync(collimator_goal_handle)
+    node.get_logger().info('UAV collimation stopped')
+
+    # Post-set UGV gains
+    node.set_followme_parameters(False)
+
+    # Give back control of agents
+    node.log('FollowMe completed')
+    while True:
+        res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+        if res1.success:
+            break
+        time.sleep(0.2)
+    while True:
+        res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+        if res2.success:
+            break
+        time.sleep(0.2)
+    node.get_logger().info('Agents back in control')
+
+    return 'followme_done'
 
 
 def emergency_landing_routine(node: GCSFSMNode) -> str:
@@ -200,6 +359,7 @@ def rtb_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('RTB')
+    node.rtb = False
     on_req: SetBool.Request = SetBool.Request(data=True)
     off_req: SetBool.Request = SetBool.Request(data=False)
     do_emergency_landing: bool = node.get_parameter('do_emergency_landing').get_parameter_value().bool_value
@@ -339,7 +499,6 @@ def rtb_routine(node: GCSFSMNode) -> str:
         time.sleep(0.2)
     node.get_logger().info('Agents back in control')
 
-    node.rtb = False
     return 'rtb_done'
 
 
