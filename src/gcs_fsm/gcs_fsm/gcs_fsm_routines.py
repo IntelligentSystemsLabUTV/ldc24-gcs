@@ -21,6 +21,8 @@ September 29, 2024
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+import subprocess
 import time
 
 from action_msgs.msg import GoalStatus
@@ -37,13 +39,87 @@ def init_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('INIT')
-    node.get_logger().info('Waiting for mission start command...')
-    while len(node.valid_ids) == 0:
-        # Wait for updates
-        node.wait_spinning()
 
-    # Do it again to update detectors
-    node.wait_spinning()
+    # Download mission data from REST server
+    try:
+        subprocess.run(
+            [
+                "wget",
+                "-O",
+                "/home/neo/workspace/logs/mission.json",
+                "http://172.16.0.18:8080"
+            ],
+            check=True)
+    except subprocess.CalledProcessError as e:
+        node.get_logger().fatal(f"Error downloading mission data: {e}")
+        return 'error'
+
+    # Display mission data and await user confirmation
+    with open('/home/neo/workspace/logs/mission.json', 'r') as f:
+        mission_data = json.load(f)
+    mission_data_hr = json.dumps(mission_data, indent=4)
+    print(mission_data_hr)
+    print('Press Enter to confirm mission data...')
+    input()
+    with open('/home/neo/workspace/logs/mission.json', 'r') as f:
+        mission_data = json.load(f)
+
+    # Parse manche
+    manche = int(mission_data['manche'])
+
+    # Parse ArUco targets
+    if 'markers' in mission_data:
+        if 'uav' in mission_data['markers']:
+            for id in mission_data['markers']['uav']:
+                node.valid_ids.append("ArUco " + str(id))
+        if 'ugv' in mission_data['markers']:
+            for id in mission_data['markers']['ugv']:
+                node.valid_ids.append("ArUco " + str(id))
+        if 'uxv' in mission_data['markers']:
+            for id in mission_data['markers']['uxv']:
+                node.valid_ids.append("ArUco " + str(id))
+    else:
+        node.get_logger().warn("No ArUco markers specified")
+
+    # Parse object targets
+    if 'object_detection' in mission_data:
+        key = 'classes' if 'classes' in mission_data['object_detection'] else 'class'
+        for obj in mission_data['object_detection'][key]:
+            if str(obj) not in node.COCO_CLASSES:
+                node.get_logger().fatal(f"Unknown object class: {str(obj)}")
+                return 'error'
+            node.valid_ids.append(str(obj))
+    else:
+        node.get_logger().warn("No object classes specified")
+
+    # Parse FollowMe waypoints
+    if 'follow_me' in mission_data:
+        node.followme_start_time = mission_data['follow_me']['time']
+        for wp in mission_data['follow_me']['wps_coordinates_world']:
+            node.followme_waypoints.append((wp[0], wp[1]))
+    else:
+        node.get_logger().warn("No FollowMe waypoints specified")
+
+    # Parse emergency tasks
+    key = 'emergency' if 'emergency' in mission_data else 'emergency_task'
+    if key in mission_data:
+        if 'landing' in mission_data[key]:
+            node.emergency_landing_id = "ArUco " + str(mission_data[key]['landing'])
+        if 'RTB' in mission_data[key]:
+            node.rtb_id = "ArUco " + str(mission_data[key]['RTB'])
+    else:
+        node.get_logger().warn("No emergency tasks specified")
+
+    # Wait second confirmation
+    print('Press Enter to confirm mission start...')
+    input()
+
+    # Open log file
+    node.open_log(manche)
+    node.log("Mission started")
+
+    # Send mission data to agents
+    node.mission_data_pub.publish(String(data=json.dumps(mission_data)))
 
     return 'start'
 
@@ -61,7 +137,7 @@ def explore_routine(node: GCSFSMNode) -> str:
     next_trigger = ''
     while True:
         # Check exit conditions
-        if len(node.valid_ids) == 0:
+        if len(node.valid_ids) == 0 and node.followme_done:
             next_trigger = 'stop'
             break
         if node.followme:
@@ -128,6 +204,7 @@ def completed_routine(node: GCSFSMNode) -> str:
     node.update_fsm_state('COMPLETED')
     node.stop_pub.publish(Empty())
     node.wait_spinning()
+    node.close_log()
     return ''
 
 

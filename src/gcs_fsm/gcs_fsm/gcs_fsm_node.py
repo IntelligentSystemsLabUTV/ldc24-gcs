@@ -24,6 +24,9 @@ September 28, 2024
 import numpy as np
 import json
 
+import cv2 as cv
+from cv_bridge import CvBridge
+
 import rclpy
 import rclpy.time
 from rclpy.duration import Duration
@@ -103,7 +106,20 @@ class GCSFSMNode(Node):
         self.rtb_id = ''
         self.emergency_landing_id = ''
         self.followme_start_time = 0.0
+        self.followme_waypoints = []
         self._color_counter = 0
+        self._log_file = None
+        self._start_time = 0
+        self._markers = [
+            Marker(
+                header=Header(
+                    frame_id='map',
+                    stamp=self.get_clock().now().to_msg()
+                ),
+                action=Marker.DELETEALL
+            )
+        ]
+        self._cv_bridge = CvBridge()
 
         # Initialize ROS 2 entities
         self._init_parameters()
@@ -194,6 +210,16 @@ class GCSFSMNode(Node):
         if not isinstance(value, float):
             raise TypeError('followme_start_time must be a float')
         self._followme_start_time = value
+
+    @property
+    def followme_waypoints(self) -> list:
+        return self._followme_waypoints
+
+    @followme_waypoints.setter
+    def followme_waypoints(self, value: list) -> None:
+        if not isinstance(value, list):
+            raise TypeError('followme_waypoints must be a list')
+        self._followme_waypoints = value
 
     @property
     def event_polling_period(self) -> float:
@@ -502,7 +528,20 @@ class GCSFSMNode(Node):
 
         :param msg: Message to parse.
         """
-        # TODO Reimplement for GCS side
+        # Log target data
+        self.log_target(msg)
+
+        # Check what kind of target was found
+        target_id: str = msg.targets.detections[0].results[0].hypothesis.class_id
+        if target_id in self.valid_ids:
+            self.valid_ids.remove(target_id)
+        elif target_id == self.rtb_id:
+            self.rtb = True
+        elif target_id == self.emergency_landing_id:
+            self.emergency_landing = True
+        else:
+            # Should never happen, but let us check
+            self.get_logger().error(f'Unknown target ID: {target_id}')
 
     def update_fsm_state(self, state: str) -> None:
         """
@@ -674,3 +713,76 @@ class GCSFSMNode(Node):
                 f'DottorCane reach_radius set to {reach_radius}')
 
         return res1.successful and res2.successful
+
+    def open_log(self, manche: int) -> None:
+        """
+        Opens the log file.
+
+        :param manche: Manche number.
+        """
+        self._log_file = open('/home/neo/workspace/logs/mission_log.txt', 'w')
+        self._log_file.write(f'--- UNIVERSITY OF ROME TOR VERGATA | MANCHE #{manche} ---\n\n')
+        self._start_time = self.get_clock().now()
+
+    def close_log(self) -> None:
+        """
+        Closes the log file.
+        """
+        self._log_file.close()
+
+    def log(self, msg: str) -> None:
+        """
+        Logs a message to the log file.
+
+        :param msg: Message to log.
+        """
+        elapsed_time: Duration = self.get_clock().now() - self._start_time
+        log_str = f'[{elapsed_time.to_msg().sec}]: {msg}\n'
+        self._log_file.write(log_str)
+
+    def log_target(self, target_data: VisualTargets) -> None:
+        """
+        Logs target data locally and to HMI.
+
+        :param target_data: Target data.
+        """
+        color = self.TARGET_COLORS[self._color_counter]
+        self._color_counter = (self._color_counter + 1) % len(self.TARGET_COLORS)
+        agent_frame_id = target_data.targets.header.frame_id
+        agent = 'UAV' if agent_frame_id.find('arianna') != -1 else 'UGV'
+        target_picture = target_data.image
+        target_position: Point = target_data.targets.detections[0].results[0].pose.pose.position
+        target_id_orig: str = target_data.targets.detections[0].results[0].hypothesis.class_id
+        target_id = target_id_orig.replace(' ', '_')
+
+        # Log target data to file
+        self.log(f'Target ({target_id}, {color[0]}) found by {agent} at ({target_position.x}, {target_position.y}, {target_position.z})')
+
+        # Save new marker
+        marker_scale = 0.3
+        marker_msg = Marker()
+        marker_msg.header.frame_id = 'map'
+        marker_msg.header.stamp = self.get_clock().now().to_msg()
+        marker_msg.type = Marker.SPHERE
+        marker_msg.action = Marker.ADD
+        marker_msg.pose.position = target_position
+        marker_msg.scale = Vector3(x=marker_scale, y=marker_scale, z=marker_scale)
+        marker_msg.color.r = color[1][0]
+        marker_msg.color.g = color[1][1]
+        marker_msg.color.b = color[1][2]
+        marker_msg.color.a = 1.0
+        self._markers.append(marker_msg)
+
+        # Publish target data to HMI
+        marker_array_msg = MarkerArray()
+        marker_array_msg.markers = self._markers
+        self.markers_pub.publish(marker_array_msg)
+
+        # Publish target picture to HMI
+        self.pictures_pub.publish(target_picture)
+
+        # Save target picture
+        cv_image = self._cv_bridge.imgmsg_to_cv2(target_picture, 'bgr8')
+        cv.imwrite(f'/home/neo/workspace/logs/target_{target_id}_{agent}.png', cv_image)
+
+        self.get_logger().warn(f'{target_id_orig} found by {agent} at ({target_position.x}, {target_position.y}, {target_position.z})')
