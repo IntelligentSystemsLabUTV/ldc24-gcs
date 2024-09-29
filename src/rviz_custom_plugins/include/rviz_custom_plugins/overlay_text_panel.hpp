@@ -1,15 +1,17 @@
 #ifndef RVIZ_CUSTOM_PLUGINS__OVERLAY_TEXT_PANEL_HPP_
 #define RVIZ_CUSTOM_PLUGINS__OVERLAY_TEXT_PANEL_HPP_
 
-#include <rclcpp/rclcpp.hpp>
 #include <rviz_common/panel.hpp>
-#include <rviz_common/properties/string_property.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
 
 #include <QLabel>
-#include <QTimer>
+#include <QLineEdit>
 #include <QVBoxLayout>
-#include <QWidget>
+#include <QHBoxLayout>
+
+#include <rviz_common/display_context.hpp>
+#include <rviz_common/ros_integration/ros_node_abstraction_iface.hpp>
 
 namespace rviz_custom_plugins
 {
@@ -21,18 +23,30 @@ class OverlayTextPanel : public rviz_common::Panel
 public:
   OverlayTextPanel(QWidget * parent = nullptr);
 
-  void stringCallback(const std_msgs::msg::String::SharedPtr msg);
+  void onInitialize() override;
 
-Q_SIGNALS:
-  void updateText(const QString & new_text);
+  // Override the save and load methods to remember the topic
+  void save(rviz_common::Config config) const override;
+  void load(const rviz_common::Config & config) override;
+
+private Q_SLOTS:
+  void updateTopic();
 
 private:
+  void subscribe();
+  void unsubscribe();
+  void callback(const std_msgs::msg::String::SharedPtr msg);
+
   QLabel * label_;
-  rclcpp::Node::SharedPtr node_;
+  QLabel * topic_info_label_;
+  QLineEdit * topic_input_;
+
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
-  rviz_common::properties::StringProperty * topic_property_;
+  rclcpp::Node::SharedPtr node_;
+
+  QString topic_name_ = "";
 };
 
-} // namespace rviz_custom_plugins
+}  // namespace rviz_custom_plugins
 
-#endif // RVIZ_CUSTOM_PLUGINS__OVERLAY_TEXT_PANEL_HPP_
+#endif  // RVIZ_CUSTOM_PLUGINS__OVERLAY_TEXT_PANEL_HPP_
