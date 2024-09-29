@@ -1,0 +1,676 @@
+"""
+GCS FSM ROS 2 node implementation.
+
+Roberto Masocco <robmasocco@gmail.com>
+Intelligent Systems Lab <isl.torvergata@gmail.com>
+
+September 28, 2024
+"""
+
+# Copyright 2024 Intelligent Systems Lab
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import numpy as np
+import json
+
+import rclpy
+import rclpy.time
+from rclpy.duration import Duration
+from rclpy.node import Node
+
+from scipy.spatial.transform import Rotation as R
+
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+
+from dua_interfaces.msg import VisualTargets
+from geometry_msgs.msg import Point, PointStamped, Pose, PoseStamped, TransformStamped, Vector3
+from rcl_interfaces.msg import Parameter, ParameterDescriptor, ParameterType
+from rcl_interfaces.msg import FloatingPointRange
+from rcl_interfaces.msg import SetParametersResult
+from sensor_msgs.msg import Image
+from std_msgs.msg import Empty, Header, String
+from vision_msgs.msg import Detection2D, Detection2DArray
+from visualization_msgs.msg import Marker, MarkerArray
+
+from dua_interfaces.srv import SafeLanding
+from rcl_interfaces.srv import SetParameters
+from std_srvs.srv import SetBool, Trigger
+
+from dua_interfaces.action import Reach, Landing, Navigate, PrecisionLanding
+
+import dua_qos_py.dua_qos_reliable as dua_qos
+
+from simple_serviceclient_py.simple_serviceclient import Client as ServiceClient
+from simple_actionclient_py.simple_actionclient import Client as ActionClient
+
+
+class GCSFSMNode(Node):
+    """
+    GCS FSM ROS 2 node implementation.
+    """
+
+    TARGET_COLORS = [
+        ("Red", (1.0, 0.0, 0.0)),        # Pure Red
+        ("Green", (0.0, 1.0, 0.0)),      # Pure Green
+        ("Blue", (0.0, 0.0, 1.0)),       # Pure Blue
+        ("Yellow", (1.0, 1.0, 0.0)),     # Bright Yellow
+        ("Cyan", (0.0, 1.0, 1.0)),       # Cyan
+        ("Magenta", (1.0, 0.0, 1.0)),    # Magenta
+        ("Orange", (1.0, 0.5, 0.0)),     # Orange
+        ("Purple", (0.5, 0.0, 0.5)),     # Dark Purple
+        ("Pink", (1.0, 0.75, 0.8)),      # Light Pink
+        ("Lime", (0.75, 1.0, 0.0))       # Lime Green
+    ]
+
+
+    COCO_CLASSES = ['airplane', 'apple', 'backpack', 'banana', 'baseball bat', 'baseball glove',
+                    'bear', 'bed', 'bench', 'bicycle', 'bird', 'boat', 'book', 'bottle', 'bowl',
+                    'broccoli', 'bus', 'cake', 'car', 'carrot', 'cat', 'cell phone', 'chair',
+                    'clock', 'couch', 'cow', 'cup', 'dining table', 'dog', 'donut', 'elephant',
+                    'fire hydrant', 'fork', 'frisbee', 'giraffe', 'hair drier', 'handbag', 'horse',
+                    'hot dog', 'keyboard', 'kite', 'knife', 'laptop', 'microwave', 'motorcycle',
+                    'mouse', 'orange', 'oven', 'parking meter', 'person', 'pizza', 'potted plant',
+                    'refrigerator', 'remote', 'sandwich', 'scissors', 'sheep', 'sink', 'skateboard',
+                    'skis', 'snowboard', 'spoon', 'sports ball', 'stop sign', 'suitcase',
+                    'surfboard', 'teddy bear', 'tennis racket', 'tie', 'toaster', 'toilet',
+                    'toothbrush', 'traffic light', 'train', 'truck', 'tv', 'umbrella', 'vase',
+                    'wine glass', 'zebra']
+
+    def __init__(self) -> None:
+        """
+        Initialize the node.
+        """
+        super().__init__('fsm')
+
+        # Set internal data
+        self.rtb = False
+        self.emergency_landing = False
+        self.followme = False
+        self.followme_done = False
+        self.valid_ids = []
+        self.rtb_id = ''
+        self.emergency_landing_id = ''
+        self.followme_start_time = 0.0
+        self._color_counter = 0
+
+        # Initialize ROS 2 entities
+        self._init_parameters()
+        self._init_tf2()
+        self._init_publishers()
+        self._init_service_clients()
+        self._init_action_clients()
+        self._init_subscribers()
+
+        self.get_logger().info('Node initialized')
+
+    @property
+    def rtb(self) -> bool:
+        return self._rtb
+
+    @rtb.setter
+    def rtb(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise TypeError('rtb must be a boolean')
+        self._rtb = value
+
+    @property
+    def emergency_landing(self) -> bool:
+        return self._emergency_landing
+
+    @emergency_landing.setter
+    def emergency_landing(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise TypeError('emergency_landing must be a boolean')
+        self._emergency_landing = value
+
+    @property
+    def followme(self) -> bool:
+        return self._followme
+
+    @followme.setter
+    def followme(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise TypeError('followme must be a boolean')
+        self._followme = value
+
+    @property
+    def followme_done(self) -> bool:
+        return self._followme_done
+
+    @followme_done.setter
+    def followme_done(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise TypeError('followme_done must be a boolean')
+        self._followme_done = value
+
+    @property
+    def valid_ids(self) -> list:
+        return self._valid_ids
+
+    @valid_ids.setter
+    def valid_ids(self, value: list) -> None:
+        if not isinstance(value, list):
+            raise TypeError('valid_ids must be a list')
+        self._valid_ids = value
+
+    @property
+    def rtb_id(self) -> str:
+        return self._rtb_id
+
+    @rtb_id.setter
+    def rtb_id(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError('rtb_id must be a string')
+        self._rtb_id = value
+
+    @property
+    def emergency_landing_id(self) -> str:
+        return self._emergency_landing_id
+
+    @emergency_landing_id.setter
+    def emergency_landing_id(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError('emergency_landing_id must be a string')
+        self._emergency_landing_id = value
+
+    @property
+    def followme_start_time(self) -> float:
+        return self._followme_start_time
+
+    @followme_start_time.setter
+    def followme_start_time(self, value: float) -> None:
+        if not isinstance(value, float):
+            raise TypeError('followme_start_time must be a float')
+        self._followme_start_time = value
+
+    @property
+    def event_polling_period(self) -> float:
+        return self._event_polling_period
+
+    @event_polling_period.setter
+    def event_polling_period(self, value: float) -> None:
+        if not isinstance(value, float):
+            raise TypeError('event_polling_period must be a float')
+        self._event_polling_period = value
+
+    @property
+    def landing_altitude(self) -> float:
+        return self._landing_altitude
+
+    @landing_altitude.setter
+    def landing_altitude(self, value: float) -> None:
+        if not isinstance(value, float):
+            raise TypeError('landing_altitude must be a float')
+        self._landing_altitude = value
+
+    @property
+    def tf_timeout(self) -> Duration:
+        return self._tf_timeout
+
+    @tf_timeout.setter
+    def tf_timeout(self, value: float) -> None:
+        if not isinstance(value, float):
+            raise TypeError('tf_timeout must be a float')
+        self._tf_timeout = Duration(nanoseconds=value * 1000000.0)
+
+    @property
+    def wait_servers(self) -> bool:
+        return self._wait_servers
+
+    @wait_servers.setter
+    def wait_servers(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise TypeError('wait_servers must be a bool')
+        self._wait_servers = value
+
+    def _init_parameters(self) -> None:
+        """
+        Initialize node parameters.
+        """
+        # do_emergency_landing
+        do_emergency_landing_descriptor = ParameterDescriptor(
+            name='do_emergency_landing',
+            type=ParameterType.PARAMETER_BOOL,
+            description='Triggers emergency landing.',
+            read_only=False,
+            dynamic_typing=False)
+        self.declare_parameter(
+            'do_emergency_landing',
+            False,
+            do_emergency_landing_descriptor)
+
+        # event_polling_period
+        event_polling_descriptor = ParameterDescriptor(
+            name='event_polling_period',
+            type=ParameterType.PARAMETER_DOUBLE,
+            description='Event polling period [s].',
+            read_only=True,
+            dynamic_typing=False,
+            floating_point_range=[FloatingPointRange(
+                from_value=0.0,
+                to_value=1.0,
+                step=0.0)])
+        self.declare_parameter(
+            'event_polling_period',
+            0.2,
+            event_polling_descriptor)
+        self.event_polling_period = self.get_parameter(
+            'event_polling_period').get_parameter_value().double_value
+        self.get_logger().info(
+            f'Event polling period: {self.event_polling_period} s')
+
+        # followme_kp_yaw
+        followme_kp_yaw_descriptor = ParameterDescriptor(
+            name='followme_kp_yaw',
+            type=ParameterType.PARAMETER_DOUBLE_ARRAY,
+            description='FollowMe DottorCane yaw PID controller gains (1: normal, 2: followme).',
+            read_only=False,
+            dynamic_typing=False)
+        self.declare_parameter(
+            'followme_kp_yaw',
+            [2.0, 2.0],
+            followme_kp_yaw_descriptor)
+
+        # followme_reach_radius
+        followme_reach_radius_descriptor = ParameterDescriptor(
+            name='followme_reach_radius',
+            type=ParameterType.PARAMETER_DOUBLE_ARRAY,
+            description='FollowMe DottorCane reach radius (1: normal, 2: followme).',
+            read_only=False,
+            dynamic_typing=False)
+        self.declare_parameter(
+            'followme_reach_radius',
+            [1.0, 1.0],
+            followme_reach_radius_descriptor)
+
+        # landing_altitude
+        landing_altitude_descriptor = ParameterDescriptor(
+            name='landing_altitude',
+            type=ParameterType.PARAMETER_DOUBLE,
+            description='Landing altitude [m].',
+            read_only=True,
+            dynamic_typing=False)
+        self.declare_parameter(
+            'landing_altitude',
+            1.0,
+            landing_altitude_descriptor)
+        self.landing_altitude = self.get_parameter(
+            'landing_altitude').get_parameter_value().double_value
+
+        # tf_timeout
+        tf_timeout_descriptor = ParameterDescriptor(
+            name='tf_timeout',
+            type=ParameterType.PARAMETER_DOUBLE,
+            description='TF lookup timeout [ms].',
+            read_only=True,
+            dynamic_typing=False)
+        self.declare_parameter(
+            'tf_timeout',
+            500.0,
+            tf_timeout_descriptor)
+        tf_timeout_ms = self.get_parameter(
+            'tf_timeout').get_parameter_value().double_value
+        self.tf_timeout = tf_timeout_ms
+        self.get_logger().info(f'TF lookup timeout: {tf_timeout_ms} ms')
+
+        # wait_servers
+        wait_servers_descriptor = ParameterDescriptor(
+            name='wait_servers',
+            type=ParameterType.PARAMETER_BOOL,
+            description='Wait for servers to be ready.',
+            read_only=True,
+            dynamic_typing=False)
+        self.declare_parameter(
+            'wait_servers',
+            False,
+            wait_servers_descriptor)
+        self.wait_servers = self.get_parameter(
+            'wait_servers').get_parameter_value().bool_value
+        self.get_logger().info(f'Wait for servers: {self.wait_servers}')
+
+    def _init_tf2(self) -> None:
+        """
+        Initialize TF2 entities.
+        """
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
+
+    def _init_publishers(self) -> None:
+        """
+        Initialize topic publishers.
+        """
+        # mission_data
+        self.mission_data_pub = self.create_publisher(
+            String,
+            '/mission_data',
+            dua_qos.get_datum_qos())
+
+        # gcs/fsm_state
+        self._fsm_state_pub = self.create_publisher(
+            String,
+            '/gcs/fsm_state',
+            dua_qos.get_datum_qos())
+
+        # hmi/markers
+        self.markers_pub = self.create_publisher(
+            MarkerArray,
+            '/hmi/markers',
+            dua_qos.get_datum_qos())
+
+        # hmi/pictures
+        self.pictures_pub = self.create_publisher(
+            Image,
+            '/hmi/pictures',
+            dua_qos.get_image_qos())
+
+        # stop
+        self.stop_pub = self.create_publisher(
+            Empty,
+            '/stop',
+            dua_qos.get_datum_qos())
+
+    def _init_service_clients(self) -> None:
+        """
+        Initialize service clients.
+        """
+        # arianna/navigation_stack/navigator/safe_landing
+        self.arianna_safe_landing_client = ServiceClient(
+            self,
+            SafeLanding,
+            '/arianna/navigation_stack/navigator/safe_landing',
+            self.wait_servers)
+
+        # arianna/emergency_landing
+        self.arianna_emergency_landing_client = ServiceClient(
+            self,
+            Trigger,
+            '/arianna/emergency_landing',
+            self.wait_servers)
+
+        # arianna/rtb
+        self.arianna_rtb_client = ServiceClient(
+            self,
+            SetBool,
+            '/arianna/rtb',
+            self.wait_servers)
+
+        # arianna/followme
+        self.arianna_followme_client = ServiceClient(
+            self,
+            SetBool,
+            '/arianna/followme',
+            self.wait_servers)
+
+        # dottorcane/rtb
+        self.dottorcane_rtb_client = ServiceClient(
+            self,
+            SetBool,
+            '/dottorcane/rtb',
+            self.wait_servers)
+
+        # dottorcane/followme
+        self.dottorcane_followme_client = ServiceClient(
+            self,
+            SetBool,
+            '/dottorcane/followme',
+            self.wait_servers)
+
+        # dottorcane/navigation_stack/navigator/set_parameters
+        self._dottorcane_navigator_set_parameters_client = ServiceClient(
+            self,
+            SetParameters,
+            '/dottorcane/navigation_stack/navigator/set_parameters',
+            self.wait_servers)
+
+        # dottorcane/position_controller/set_parameters
+        self._dottorcane_pos_controller_set_parameters_client = ServiceClient(
+            self,
+            SetParameters,
+            '/dottorcane/position_controller/set_parameters',
+            self.wait_servers)
+
+    def _init_action_clients(self) -> None:
+        """
+        Initialize action clients.
+        """
+        # arianna/flight_stack/flight_control/landing
+        self.arianna_landing_client = ActionClient(
+            self,
+            Landing,
+            '/arianna/flight_stack/flight_control/landing',
+            None,
+            self.wait_servers)
+
+        # arianna/flight_stack/flight_control/reach
+        self.arianna_reach_client = ActionClient(
+            self,
+            Reach,
+            '/arianna/flight_stack/flight_control/reach',
+            None,
+            self.wait_servers)
+
+        # arianna/navigation_stack/navigator/navigate
+        self.arianna_navigate_client = ActionClient(
+            self,
+            Navigate,
+            '/arianna/navigation_stack/navigator/navigate',
+            None,
+            self.wait_servers)
+
+        # arianna/collimator/collimate
+        self.arianna_collimate_client = ActionClient(
+            self,
+            PrecisionLanding,
+            '/arianna/collimator/collimate',
+            None,
+            self.wait_servers)
+
+        # dottorcane/navigation_stack/navigator/navigate
+        self.dottorcane_navigate_client = ActionClient(
+            self,
+            Navigate,
+            '/dottorcane/navigation_stack/navigator/navigate',
+            None,
+            self.wait_servers)
+
+    def _init_subscribers(self) -> None:
+        """
+        Initialize topic subscribers.
+        """
+        # hmi/found_targets/visual
+        self._found_targets_visual_sub = self.create_subscription(
+            VisualTargets,
+            '/hmi/found_targets/visual',
+            self._found_targets_visual_callback,
+            dua_qos.get_datum_qos())
+
+    def _found_targets_visual_callback(self, msg: VisualTargets) -> None:
+        """
+        Process notifications of targets found by the agents.
+
+        :param msg: Message to parse.
+        """
+        # TODO Reimplement for GCS side
+
+    def update_fsm_state(self, state: str) -> None:
+        """
+        Update the FSM state.
+
+        :param state: New FSM state.
+        """
+        self.get_logger().warn(state)
+        if state == 'EXPLORE':
+            self.exploring = True
+        else:
+            self.exploring = False
+        for i in range(10):
+            self._fsm_state_pub.publish(String(data=state))
+
+    def wait_spinning(self) -> None:
+        """
+        Processes background jobs while waiting for events.
+
+        :raises RuntimeError: If the ROS 2 context is unavailable.
+        """
+        # Do a round of spin
+        executor = rclpy.get_global_executor()
+        if not executor._context.ok() or executor._is_shutdown:
+            raise RuntimeError('wait_spinning: context unavailable')
+        executor.add_node(self)
+        try:
+            executor.spin_once(timeout_sec=self.event_polling_period)
+        finally:
+            executor.remove_node(self)
+
+    def get_agent_pose(self, agent: str) -> PoseStamped:
+        """
+        Returns current agent pose in global frame.
+
+        :param agent: Agent name.
+        :return: Current pose.
+        """
+        transform = TransformStamped()
+        while True:
+            try:
+                transform = self._tf_buffer.lookup_transform(
+                    'map',
+                    agent + '/base_link',
+                    rclpy.time.Time(),
+                    self.tf_timeout)
+                break
+            except:
+                continue
+
+        curr_pose = PoseStamped(
+            header=Header(
+                stamp=self.get_clock().now().to_msg(),
+                frame_id='map'),
+            pose=Pose(
+                position=Point(
+                    x=transform.transform.translation.x,
+                    y=transform.transform.translation.y,
+                    z=transform.transform.translation.z),
+                orientation=transform.transform.rotation))
+        return curr_pose
+
+    def get_target_pose(self, target_data: Detection2D) -> Pose:
+        """
+        Returns the pose of a target in the global frame.
+
+        :param target_data: Target data.
+        :return: Target pose.
+        """
+        tgt_frame = target_data.header.frame_id
+        tgt_pose: Pose = target_data.results[0].pose.pose
+        target_tf = TransformStamped()
+        while True:
+            try:
+                target_tf = self._tf_buffer.lookup_transform(
+                    'map',
+                    tgt_frame,
+                    rclpy.time.Time(),
+                    self.tf_timeout)
+                break
+            except:
+                continue
+
+        q_tf = [target_tf.transform.rotation.x,
+                target_tf.transform.rotation.y,
+                target_tf.transform.rotation.z,
+                target_tf.transform.rotation.w]
+        rot_tf = R.from_quat(q_tf).as_matrix()
+        vec_tf = np.array([target_tf.transform.translation.x,
+                           target_tf.transform.translation.y,
+                           target_tf.transform.translation.z])
+        iso_tf = np.eye(4)
+        iso_tf[:3, :3] = rot_tf
+        iso_tf[:3, 3] = vec_tf
+
+        q_tgt = [tgt_pose.orientation.x,
+                 tgt_pose.orientation.y,
+                 tgt_pose.orientation.z,
+                 tgt_pose.orientation.w]
+        rot_tgt = R.from_quat(q_tgt).as_matrix()
+        vec_tgt = np.array([tgt_pose.position.x,
+                            tgt_pose.position.y,
+                            tgt_pose.position.z])
+        iso_tgt = np.eye(4)
+        iso_tgt[:3, :3] = rot_tgt
+        iso_tgt[:3, 3] = vec_tgt
+
+        iso_tgt_map = np.matmul(iso_tf, iso_tgt)
+        q_tgt_map = R.from_matrix(iso_tgt_map[:3, :3]).as_quat()
+
+        tgt_pose_map: Pose = Pose()
+        tgt_pose_map.position.x = iso_tgt_map[0, 3]
+        tgt_pose_map.position.y = iso_tgt_map[1, 3]
+        tgt_pose_map.position.z = iso_tgt_map[2, 3]
+        tgt_pose_map.orientation.x = q_tgt_map[0]
+        tgt_pose_map.orientation.y = q_tgt_map[1]
+        tgt_pose_map.orientation.z = q_tgt_map[2]
+        tgt_pose_map.orientation.w = q_tgt_map[3]
+        return tgt_pose_map
+
+    def set_followme_parameters(self, pre: bool) -> bool:
+        """
+        Sets relevant parameters for FollowMe, before or after.
+
+        :param param: Pre/post FollowMe.
+        :return: True if the service call succeeded, False otherwise.
+        """
+        # Get parameters values to set
+        kp_yaws = self.get_parameter(
+            'followme_kp_yaw').get_parameter_value().double_array_value
+        reach_radii = self.get_parameter(
+            'followme_reach_radius').get_parameter_value().double_array_value
+        if pre:
+            kp_yaw = kp_yaws[1]
+            reach_radius = reach_radii[1]
+        else:
+            kp_yaw = kp_yaws[0]
+            reach_radius = reach_radii[0]
+
+        # Update yaw PID controller gain
+        params_msg = SetParameters.Request()
+        param_msg = Parameter()
+        param_msg.name = 'ctrl_angular_err_gain'
+        param_msg.value.type = ParameterType.PARAMETER_DOUBLE
+        param_msg.value.double_value = kp_yaw
+        params_msg.parameters.append(param_msg)
+        res1: SetParametersResult = self._dottorcane_pos_controller_set_parameters_client.call_sync(
+            params_msg).results[0]
+        if not res1.successful:
+            self.get_logger().error(
+                f'DottorCane kp_yaw update failed: {res1.reason}')
+        else:
+            self.get_logger().info(f'DottorCane kp_yaw set to {kp_yaw}')
+
+        # Update reach radius
+        params_msg = SetParameters.Request()
+        param_msg = Parameter()
+        param_msg.name = 'reach_radius'
+        param_msg.value.type = ParameterType.PARAMETER_DOUBLE
+        param_msg.value.double_value = reach_radius
+        params_msg.parameters.append(param_msg)
+        res2: SetParametersResult = self._dottorcane_navigator_set_parameters_client.call_sync(
+            params_msg).results[0]
+        if not res2.successful:
+            self.get_logger().error(
+                f'DottorCane reach_radius update failed: {res2.reason}')
+        else:
+            self.get_logger().info(
+                f'DottorCane reach_radius set to {reach_radius}')
+
+        return res1.successful and res2.successful
