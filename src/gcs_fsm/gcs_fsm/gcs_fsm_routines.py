@@ -94,9 +94,9 @@ def init_routine(node: GCSFSMNode) -> str:
 
     # Parse FollowMe waypoints
     if 'follow_me' in mission_data:
-        node.followme_start_time = mission_data['follow_me']['time']
+        node.followme_start_time = float(mission_data['follow_me']['time'])
         for wp in mission_data['follow_me']['wps_coordinates_world']:
-            node.followme_waypoints.append((wp[0], wp[1]))
+            node.followme_waypoints.append((float(wp[0]), float(wp[1])))
     else:
         node.get_logger().warn("No FollowMe waypoints specified")
 
@@ -138,6 +138,7 @@ def explore_routine(node: GCSFSMNode) -> str:
     while True:
         # Check exit conditions
         if len(node.valid_ids) == 0 and node.followme_done:
+            time.sleep(5) # Just in case...
             next_trigger = 'stop'
             break
         if node.followme:
@@ -180,7 +181,15 @@ def emergency_landing_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('EMERGENCY_LANDING')
-    pass
+
+    # Trigger UAV emergency landing
+    req: Trigger.Request = Trigger.Request()
+    node.arianna_emergency_landing_client.call_sync(req)
+    node.emergency_landing = False
+    node.get_logger().info('UAV emergency landing triggered')
+    node.log("UAV emergency landing started")
+
+    return 'emergency_landing_done'
 
 
 def rtb_routine(node: GCSFSMNode) -> str:
@@ -191,7 +200,147 @@ def rtb_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('RTB')
-    pass
+    on_req: SetBool.Request = SetBool.Request(data=True)
+    off_req: SetBool.Request = SetBool.Request(data=False)
+    do_emergency_landing: bool = node.get_parameter('do_emergency_landing').get_parameter_value().bool_value
+
+    # Get control of agents
+    while True:
+        res1: SetBool.Response = node.arianna_rtb_client.call_sync(on_req)
+        if res1.success:
+            break
+        time.sleep(0.2)
+    node.get_logger().info('UAV in RTB')
+    while True:
+        res2: SetBool.Response = node.dottorcane_rtb_client.call_sync(on_req)
+        if res2.success:
+            break
+        time.sleep(0.2)
+    node.get_logger().info('UGV in RTB')
+    node.log('RTB started')
+
+    # Send agents back to base
+    arianna_nav_goal = Navigate.Goal(
+        header=Header(
+            stamp=node.get_clock().now().to_msg(),
+            frame_id='map'
+        ),
+        target=Point(
+            x=2.84,
+            y=6.16,
+            z=2.0
+        )
+    )
+    dottorcane_nav_goal = Navigate.Goal(
+        header=Header(
+            stamp=node.get_clock().now().to_msg(),
+            frame_id='map'
+        ),
+        target=Point(
+            x=2.42,
+            y=7.83,
+            z=0.33
+        )
+    )
+    arianna_goal_handle = node.arianna_navigate_client.send_goal_sync(arianna_nav_goal)
+    dottorcane_goal_handle = node.dottorcane_navigate_client.send_goal_sync(dottorcane_nav_goal)
+    if arianna_goal_handle is None or dottorcane_goal_handle is None:
+        node.get_logger().error('Error sending RTB goals')
+        # Give back control of agents
+        while True:
+            res1: SetBool.Response = node.arianna_rtb_client.call_sync(off_req)
+            if res1.success:
+                break
+            time.sleep(0.2)
+        while True:
+            res2: SetBool.Response = node.dottorcane_rtb_client.call_sync(off_req)
+            if res2.success:
+                break
+            time.sleep(0.2)
+        node.get_logger().info('Agents back in control')
+        node.log('RTB aborted')
+        return 'rtb_done'
+    node.get_logger().info('RTB goals sent')
+
+    # Wait for agents to get to base
+    dottorcane_res: Navigate.Result = node.dottorcane_navigate_client.get_result_sync(dottorcane_goal_handle)
+    arianna_res: Navigate.Result = node.arianna_navigate_client.get_result_sync(arianna_goal_handle)
+    if dottorcane_res.result.result != CommandResultStamped.SUCCESS or arianna_res.result.result != CommandResultStamped.SUCCESS:
+        node.get_logger().error('Error executing RTB')
+        # Give back control of agents
+        while True:
+            res1: SetBool.Response = node.arianna_rtb_client.call_sync(off_req)
+            if res1.success:
+                break
+            time.sleep(0.2)
+        while True:
+            res2: SetBool.Response = node.dottorcane_rtb_client.call_sync(off_req)
+            if res2.success:
+                break
+            time.sleep(0.2)
+        node.get_logger().info('Agents back in control')
+        node.log('RTB aborted')
+        return 'rtb_done'
+    node.get_logger().info('Agents at base')
+
+    # Do emergency landing
+    if do_emergency_landing:
+        # Get to emergency landing coordinates
+        req = SafeLanding.Request()
+        agent_pose: PoseStamped = node.get_agent_pose('arianna')
+        res: SafeLanding.Response = node.arianna_safe_landing_client.call_sync(req)
+        reach_goal = Reach.Goal(
+            target_pose=PoseStamped(
+                header=Header(
+                    stamp=node.get_clock().now().to_msg(),
+                    frame_id='map'
+                ),
+                pose=Pose(
+                    position=Point(
+                        x=res.site.point.x,
+                        y=res.site.point.y,
+                        z=2.0
+                    ),
+                    orientation=agent_pose.pose.orientation
+                )
+            ),
+            reach_radius=0.1,
+            stop_at_target=True
+        )
+        node.arianna_reach_client.call(reach_goal)
+        node.get_logger().info('UAV at emergency landing site')
+    node.get_logger().info('Starting UAV landing')
+    land_goal: Landing.Goal = Landing.Goal(
+        minimums=PointStamped(
+            header=Header(
+                stamp=node.get_clock().now().to_msg(),
+                frame_id='map'
+            ),
+            point=Point(
+                x=2.84,
+                y=6.16,
+                z=node.landing_altitude
+            )
+        )
+    )
+    node.arianna_landing_client.call(land_goal)
+
+    # Give back control of agents
+    node.log('RTB completed')
+    while True:
+        res1: SetBool.Response = node.arianna_rtb_client.call_sync(off_req)
+        if res1.success:
+            break
+        time.sleep(0.2)
+    while True:
+        res2: SetBool.Response = node.dottorcane_rtb_client.call_sync(off_req)
+        if res2.success:
+            break
+        time.sleep(0.2)
+    node.get_logger().info('Agents back in control')
+
+    node.rtb = False
+    return 'rtb_done'
 
 
 def completed_routine(node: GCSFSMNode) -> str:

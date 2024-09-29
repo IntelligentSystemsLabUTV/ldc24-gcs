@@ -573,6 +573,13 @@ class GCSFSMNode(Node):
         finally:
             executor.remove_node(self)
 
+        # Check FollowMe time
+        if not self.followme and not self.followme_done:
+            curr_time = self.get_clock().now()
+            elapsed_time: Duration = curr_time - self._start_time
+            if float(elapsed_time.nanoseconds) / float(1e6) >= (self.followme_start_time * 1000.0):
+                self.followme = True
+
     def get_agent_pose(self, agent: str) -> PoseStamped:
         """
         Returns current agent pose in global frame.
