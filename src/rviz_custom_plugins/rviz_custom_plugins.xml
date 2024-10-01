@@ -1,9 +1,12 @@
 <library path="rviz_custom_plugins">
-  <class name="OverlayTextPanel"
-         type="rviz_custom_plugins::OverlayTextPanel"
-         base_class_type="rviz_common::Panel">
+  <class name="OverlayTextPanel" type="rviz_custom_plugins::OverlayTextPanel" base_class_type="rviz_common::Panel">
     <description>
       A panel that displays text from a ROS 2 topic.
+    </description>
+  </class>
+  <class name="ButtonPanel" type="rviz_custom_plugins::ButtonPanel" base_class_type="rviz_common::Panel">
+    <description>
+      A panel that displays a button
     </description>
   </class>
 </library>

@@ -16,8 +16,7 @@ OverlayTextPanel::OverlayTextPanel(QWidget * parent)
   topic_layout->addWidget(topic_info_label_);
   topic_layout->addWidget(topic_input_);
 
-  QVBoxLayout * layout = new QVBoxLayout;
-  layout->addLayout(topic_layout);
+  QHBoxLayout * layout = new QHBoxLayout;
   layout->addWidget(label_);
   setLayout(layout);
 

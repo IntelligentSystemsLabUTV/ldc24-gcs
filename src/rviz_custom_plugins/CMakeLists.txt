@@ -23,10 +23,12 @@ find_package(std_msgs REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 qt5_wrap_cpp(MOC_FILES
+  include/rviz_custom_plugins/button_panel.hpp
   include/rviz_custom_plugins/overlay_text_panel.hpp
 )
 
 add_library(rviz_custom_plugins SHARED
+  src/rviz_custom_plugins/button_panel.cpp
   src/rviz_custom_plugins/overlay_text_panel.cpp
   ${MOC_FILES}
 )
@@ -55,7 +57,7 @@ install(FILES rviz_custom_plugins.xml
         DESTINATION share/${PROJECT_NAME}
 )
 
-install(FILES icons/classes/OverlayTextPanel.png
+install(FILES icons/classes/ButtonPanel.png icons/classes/OverlayTextPanel.png
         DESTINATION share/${PROJECT_NAME}/icons/classes
 )
 
