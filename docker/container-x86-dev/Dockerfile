@@ -26,6 +26,30 @@ ARG USER_UID=1000
 ENV DEBIAN_FRONTEND=noninteractive
 
 # IMAGE SETUP START #
+# go2_stack START #
+# Configure Cyclone DDS RMW
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ros-humble-rosidl-generator-dds-idl && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*/apt/lists/*
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# Install unitree_sdk2
+WORKDIR /opt
+RUN git clone --single-branch --branch 'main' --depth 1 https://github.com/unitreerobotics/unitree_sdk2.git && \
+  cd unitree_sdk2 && \
+  mkdir build && \
+  cd build && \
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebugInfo -DBUILD_EXAMPLES=OFF .. && \
+  make install && \
+  cd ../.. && \
+  chgrp -R internal /opt/unitree_sdk2 && \
+  chmod -R g+rw /opt/unitree_sdk2
+WORKDIR /root
+
+# Install nlohmann/json C++ library
+RUN mkdir -p /usr/local/include/nlohmann && \
+  wget -O /usr/local/include/nlohmann/json.hpp https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
+# go2_stack END #
 # IMAGE SETUP END #
 
 # Create a user with Zsh as shell, hashed password, and add it to the sudoers

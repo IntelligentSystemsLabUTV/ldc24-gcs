@@ -6,3 +6,6 @@
 	path = src/zed_drivers
 	url = git@github.com:dotX-Automation/zed_drivers.git
 	branch = master
+[submodule "src/go2_stack"]
+	path = src/go2_stack
+	url = git@github.com:dotX-Automation/go2_stack
