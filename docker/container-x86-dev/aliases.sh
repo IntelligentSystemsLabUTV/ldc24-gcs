@@ -26,3 +26,4 @@
 alias ls='ls --color=auto'
 alias ll='ls -la'
 alias valgrind-check='valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --verbose --log-file=valgrind.out'
+alias clc='clear'
