@@ -7,13 +7,13 @@
       ///      This identifier will also appears in the logs of all other bridges on discovery events.
       ///      By default a random UUID
       ////
-      id: "tenny",
+      id: "gcs",
 
       ////
       //// nodename: A ROS node name to be used by this bridge.
       ////            Default: "zenoh_bridge_ros2dds"
       ////
-      nodename: "tenny/zenoh_bridge",
+      nodename: "gcs/zenoh_bridge",
 
       ////
       //// namespace: A ROS namespace which:
@@ -28,7 +28,7 @@
       ////
       //// domain: The DDS Domain ID. By default set to 0, or to "$ROS_DOMAIN_ID" is this environment variable is defined.
       ////
-      domain: 2,
+      domain: 1,
 
       ////
       //// ros_localhost_only: If set to true, the DDS discovery and traffic will occur only on the localhost interface (127.0.0.1).
@@ -148,14 +148,14 @@
   //// Which endpoints to connect to. E.g. tcp/localhost:7447.
   //// By configuring the endpoints, it is possible to tell zenoh which router/peer to connect to at startup.
   ////
+  // - Tenny
   // - Rob
-  // - Lore
   // - Arianna
   // - DottorCane
   connect: {
     endpoints: [
+      "tcp/172.16.0.14:7447",
       "tcp/172.16.0.2:7447",
-      "tcp/172.16.0.18:7447",
       "tcp/172.16.0.12:7447",
       "tcp/172.16.0.15:7447"
     ]
@@ -168,7 +168,7 @@
   ////
   listen: {
     endpoints: [
-      "tcp/172.16.0.14:7447"
+      "tcp/172.16.0.18:7447"
     ]
   },
 }

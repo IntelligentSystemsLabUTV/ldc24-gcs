@@ -149,11 +149,13 @@
   //// By configuring the endpoints, it is possible to tell zenoh which router/peer to connect to at startup.
   ////
   // - Tenny
+  // - Lore
   // - Arianna
   // - DottorCane
   connect: {
     endpoints: [
       "tcp/172.16.0.14:7447",
+      "tcp/172.16.0.18:7447",
       "tcp/172.16.0.12:7447",
       "tcp/172.16.0.15:7447"
     ]
