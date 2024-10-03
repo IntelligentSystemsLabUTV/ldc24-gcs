@@ -11,7 +11,7 @@
 
   <depend>arianna_description</depend>
   <depend>dottorcane_description</depend>
-  <depend>go2_stack</depend>
+  <depend>go2_description</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

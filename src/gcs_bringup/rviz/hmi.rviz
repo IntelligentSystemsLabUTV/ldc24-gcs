@@ -16,7 +16,7 @@ Panels:
         - /Dottor Cane1/Mapper1
         - /Dottor Cane1/Navigator1
         - /Dottor Cane1/Explorer1
-      Splitter Ratio: 0.8088235259056091
+      Splitter Ratio: 0.8294117450714111
     Tree Height: 937
   - Class: rviz_common/Selection
     Name: Selection
@@ -119,7 +119,7 @@ Visualization Manager:
             Durability Policy: Volatile
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /robot_description
+            Value: ""
           Enabled: true
           Links:
             All Links Enabled:
@@ -152,7 +152,7 @@ Visualization Manager:
             Inertia: false
             Mass: false
           Name: Model
-          TF Prefix: arianna
+          TF Prefix: ""
           Update Interval: 0
           Value: true
           Visual Enabled: true
@@ -412,177 +412,21 @@ Visualization Manager:
             Durability Policy: Volatile
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /robot_description
-          Enabled: true
+            Value: ""
+          Enabled: false
           Links:
             All Links Enabled: true
             Expand Joint Details: false
             Expand Link Details: false
             Expand Tree: false
-            FL_calf:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FL_calflower:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FL_calflower1:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FL_foot:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FL_hip:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FL_thigh:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FR_calf:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FR_calflower:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FR_calflower1:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FR_foot:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FR_hip:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            FR_thigh:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            Head_lower:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            Head_upper:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
             Link Tree Style: Links in Alphabetic Order
-            RL_calf:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RL_calflower:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RL_calflower1:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RL_foot:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RL_hip:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RL_thigh:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RR_calf:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RR_calflower:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RR_calflower1:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RR_foot:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RR_hip:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            RR_thigh:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            base_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            front_camera:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-              Value: true
-            imu:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            left_camera_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            right_camera_link:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
-            utlidar:
-              Alpha: 1
-              Show Axes: false
-              Show Trail: false
           Mass Properties:
             Inertia: false
             Mass: false
           Name: Model
-          TF Prefix: dottorcane
+          TF Prefix: ""
           Update Interval: 0
-          Value: true
+          Value: false
           Visual Enabled: true
         - Class: rviz_common/Group
           Displays:
@@ -987,7 +831,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 21.0213680267334
+      Distance: 36.27277374267578
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
