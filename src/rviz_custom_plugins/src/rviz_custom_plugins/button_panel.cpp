@@ -10,8 +10,12 @@ ButtonPanel::ButtonPanel(QWidget * parent)
   node_ = std::make_shared<rclcpp::Node>("rviz_button_node");
 
   // Create publishers for two different topics
-  publisher_start_ = node_->create_publisher<std_msgs::msg::String>("/start", 10);
-  publisher_stop_ = node_->create_publisher<std_msgs::msg::String>("/stop", 10);
+  publisher_start_ = node_->create_publisher<std_msgs::msg::Empty>(
+    "/start",
+    dua_qos::Reliable::get_datum_qos());
+  publisher_stop_ = node_->create_publisher<std_msgs::msg::Empty>(
+    "/stop",
+    dua_qos::Reliable::get_datum_qos());
 
   // Create the first button
   button_start_ = new QPushButton("START", this);
@@ -34,18 +38,18 @@ void ButtonPanel::startButtonClicked()
 {
   // Publish empty message on the first topic
   std_msgs::msg::Empty empty_msg;
-  std_msgs::msg::String str_msg;
-  str_msg.set__data("start");
-  publisher_start_->publish(str_msg);
+  for (int i = 0; i < 10; i++) {
+    publisher_start_->publish(empty_msg);
+  }
 }
 
 void ButtonPanel::stopButtonClicked()
 {
   // Publish empty message on the second topic
   std_msgs::msg::Empty empty_msg;
-  std_msgs::msg::String str_msg;
-  str_msg.set__data("stop");
-  publisher_stop_->publish(str_msg);
+  for (int i = 0; i < 10; i++) {
+    publisher_stop_->publish(empty_msg);
+  }
 }
 
 }  // namespace rviz_custom_plugins

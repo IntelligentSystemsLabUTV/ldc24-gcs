@@ -1,10 +1,10 @@
 #ifndef RVIZ_CUSTOM_PLUGINS__BUTTON_PANEL_HPP_
 #define RVIZ_CUSTOM_PLUGINS__BUTTON_PANEL_HPP_
 
+#include <dua_qos_cpp/dua_qos.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rviz_common/panel.hpp>
 #include <std_msgs/msg/empty.hpp>
-#include <std_msgs/msg/string.hpp>
 
 #include <QPushButton>
 #include <QHBoxLayout>
@@ -26,8 +26,8 @@ private Q_SLOTS:
 
 private:
   rclcpp::Node::SharedPtr node_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_start_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_stop_;
+  rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr publisher_start_;
+  rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr publisher_stop_;
   QPushButton * button_start_;
   QPushButton * button_stop_;
 };

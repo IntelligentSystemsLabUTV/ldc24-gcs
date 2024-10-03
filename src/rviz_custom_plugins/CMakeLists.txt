@@ -16,6 +16,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(dua_qos_cpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
@@ -37,6 +38,7 @@ target_include_directories(rviz_custom_plugins PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(rviz_custom_plugins
+  dua_qos_cpp
   pluginlib
   rviz_common
   rviz_rendering
