@@ -302,10 +302,12 @@ def followme_routine(node: GCSFSMNode) -> str:
     node.set_followme_parameters(True)
 
     # Wait for UAV stabilization over target
-    time.sleep(5.0)
+    time.sleep(3.0)
     node.log('FollowMe started')
 
     # Send UGV
+    collimate_done = False
+    collimate_future = node.arianna_collimate_client.get_result(collimator_goal_handle)
     for i in range(1, len(node.followme_waypoints)):
         node.get_logger().info(f'Going to waypoint ({i+1})')
         nav_goal = Navigate.Goal(
@@ -320,12 +322,28 @@ def followme_routine(node: GCSFSMNode) -> str:
             )
         )
         node.dottorcane_navigate_client.call(nav_goal)
-        time.sleep(2.0)
+        time.sleep(1.0)
+        if collimate_future.done():
+            # Try to recover collimation: send UAV to next waypoint
+            nav_goal.target.z = 2.0
+            node.arianna_navigate_client.call(nav_goal)
+            collimator_goal_handle = node.arianna_collimate_client.send_goal_sync(collimator_goal)
+            if collimator_goal_handle is None:
+                collimate_done = True
+                node.get_logger().error('UAV re-collimation rejected')
+                break
+            collimate_future = node.arianna_collimate_client.get_result(collimator_goal_handle)
+            time.sleep(3.0)
+            if collimate_future.done():
+                collimate_done = True
+                node.get_logger().error('UAV collimation failed')
+                break
 
     # Stop collimation
-    node.arianna_collimate_client.cancel_sync(collimator_goal_handle)
-    node.arianna_collimate_client.get_result_sync(collimator_goal_handle)
-    node.get_logger().info('UAV collimation stopped')
+    if not collimate_done:
+        node.arianna_collimate_client.cancel_sync(collimator_goal_handle)
+        node.arianna_collimate_client.get_result_sync(collimator_goal_handle)
+        node.get_logger().info('UAV collimation stopped')
 
     # Post-set UGV gains
     node.set_followme_parameters(False)
