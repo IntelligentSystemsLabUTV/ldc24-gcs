@@ -387,12 +387,6 @@ class GCSFSMNode(Node):
             '/hmi/pictures',
             dua_qos.get_image_qos())
 
-        # stop
-        self.stop_pub = self.create_publisher(
-            Empty,
-            '/stop',
-            dua_qos.get_datum_qos())
-
     def _init_service_clients(self) -> None:
         """
         Initialize service clients.
@@ -698,6 +692,7 @@ class GCSFSMNode(Node):
         """
         Closes the log file.
         """
+        self.log("--- END OF MISSION ---")
         self._log_file.close()
 
     def log(self, msg: str) -> None:

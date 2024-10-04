@@ -510,8 +510,6 @@ def completed_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('COMPLETED')
-    node.stop_pub.publish(Empty())
-    node.wait_spinning()
     node.close_log()
     return ''
 
