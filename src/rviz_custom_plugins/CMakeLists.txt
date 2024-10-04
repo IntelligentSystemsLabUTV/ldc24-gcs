@@ -16,20 +16,27 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(dua_interfaces REQUIRED)
 find_package(dua_qos_cpp REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
 find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(vision_msgs REQUIRED)
+
 
 set(CMAKE_AUTOMOC ON)
 qt5_wrap_cpp(MOC_FILES
   include/rviz_custom_plugins/button_panel.hpp
+  include/rviz_custom_plugins/interactive_marker.hpp
   include/rviz_custom_plugins/overlay_text_panel.hpp
 )
 
 add_library(rviz_custom_plugins SHARED
   src/rviz_custom_plugins/button_panel.cpp
+  src/rviz_custom_plugins/interactive_marker.cpp
   src/rviz_custom_plugins/overlay_text_panel.cpp
   ${MOC_FILES}
 )
@@ -38,11 +45,15 @@ target_include_directories(rviz_custom_plugins PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 ament_target_dependencies(rviz_custom_plugins
+  dua_interfaces
   dua_qos_cpp
   pluginlib
+  Qt5
   rviz_common
   rviz_rendering
+  sensor_msgs
   std_msgs
+  vision_msgs
 )
 
 install(TARGETS rviz_custom_plugins
@@ -59,7 +70,7 @@ install(FILES rviz_custom_plugins.xml
         DESTINATION share/${PROJECT_NAME}
 )
 
-install(FILES icons/classes/ButtonPanel.png icons/classes/OverlayTextPanel.png
+install(FILES icons/classes/ButtonPanel.png icons/classes/InteractiveMarker icons/classes/OverlayTextPanel.png
         DESTINATION share/${PROJECT_NAME}/icons/classes
 )
 
