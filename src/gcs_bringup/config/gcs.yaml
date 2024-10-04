@@ -1,0 +1,120 @@
+/gcs/fsm:
+  ros__parameters:
+    do_emergency_landing: true
+    event_polling_period: 0.2
+    followme_kp_yaw:
+      - 2.0
+      - 0.7
+    followme_reach_radius:
+      - 1.0
+      - 0.25
+    landing_altitude: 1.5
+    tf_timeout: 500.0
+    use_sim_time: false
+    wait_servers: true
+
+/gcs/arianna_zed2i_driver:
+  ros__parameters:
+    autostart: true
+    base_link_name: base_link
+    camera_fps: 15
+    camera_resolution: HD720
+    camera_serial_number: -1
+    camera_settings_path: ""
+    depth_confidence: 20
+    depth_fill: false
+    depth_max_distance: 15.0
+    depth_min_distance: 0.5
+    depth_mode: NONE
+    depth_rate: 15
+    depth_resolution:
+      - 672
+      - 376
+    depth_stabilization: 100
+    depth_texture_confidence: 100
+    frame_prefix: arianna/
+    local_frame: arianna/odom
+    publish_tf: false
+    sensors_sampling_time: 16666
+    streaming_adaptative_bitrate: false
+    streaming_bitrate: 3000
+    streaming_chunk_size: 16084
+    streaming_codec: ""
+    streaming_gop_size: 5
+    streaming_sender_ip: "172.16.0.12"
+    streaming_sender_port: 30000
+    streaming_target_fps: 15
+    svo_compression: H264
+    svo_file: ''
+    svo_record: false
+    svo_transcode_stream: false
+    tracking_depth_min_range: -1.0
+    tracking_enable: false
+    tracking_enable_area_memory: true
+    tracking_enable_imu_fusion: true
+    tracking_enable_pose_smoothing: true
+    tracking_set_gravity_as_origin: false
+    use_sim_time: false
+    verbose: true
+    video_sd_reliable: true
+    video_sd_resolution:
+      - 672
+      - 376
+    video_stream_hd: false
+    video_stream_rate: 15
+    video_stream_record_path: ""
+    x_correction: 1.0
+    y_correction: 1.0
+
+/gcs/dottorcane_zed2i_driver:
+  ros__parameters:
+    autostart: true
+    base_link_name: base_link
+    camera_fps: 15
+    camera_resolution: HD720
+    camera_serial_number: -1
+    camera_settings_path: ""
+    depth_confidence: 20
+    depth_fill: false
+    depth_max_distance: 15.0
+    depth_min_distance: 0.5
+    depth_mode: NONE
+    depth_rate: 15
+    depth_resolution:
+      - 672
+      - 376
+    depth_stabilization: 100
+    depth_texture_confidence: 100
+    frame_prefix: dottorcane/
+    local_frame: dottorcane/odom
+    publish_tf: false
+    sensors_sampling_time: 16666
+    streaming_adaptative_bitrate: false
+    streaming_bitrate: 3000
+    streaming_chunk_size: 16084
+    streaming_codec: ""
+    streaming_gop_size: 5
+    streaming_sender_ip: "172.16.0.15"
+    streaming_sender_port: 30000
+    streaming_target_fps: 15
+    svo_compression: H264
+    svo_file: ''
+    svo_record: false
+    svo_transcode_stream: false
+    tracking_depth_min_range: -1.0
+    tracking_enable: false
+    tracking_enable_area_memory: true
+    tracking_enable_imu_fusion: true
+    tracking_enable_pose_smoothing: true
+    tracking_set_gravity_as_origin: false
+    use_sim_time: false
+    verbose: true
+    video_sd_reliable: true
+    video_sd_resolution:
+      - 672
+      - 376
+    video_stream_hd: false
+    video_stream_rate: 15
+    video_stream_record_path: ""
+    x_correction: 1.0
+    y_correction: 1.0
