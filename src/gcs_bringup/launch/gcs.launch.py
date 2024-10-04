@@ -102,6 +102,6 @@ def generate_launch_description():
         namespace='gcs',
         parameters=[config]
     )
-    #ld.add_action(fsm_node)
+    ld.add_action(fsm_node)
 
     return ld
