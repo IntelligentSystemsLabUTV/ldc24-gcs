@@ -50,3 +50,182 @@ function utils-update {
   source "install/local_setup.$CURR_SHELL"
   popd || return
 }
+
+# Moves the drone to a target position
+function reach {
+  # Check input arguments
+  if [[ $# -ne 5 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    reach X Y Z YAW RADIUS"
+    echo >&2 "XYZ must be w.r.t. a NWU reference frame, YAW must be in [-180° +180°], RADIUS is absolute."
+    return 1
+  fi
+
+  local yaw_rad
+  yaw_rad="$(degrad "$4")"
+
+  ros2 action send_goal -f \
+    "$NAMESPACE"/flight_stack/flight_control/reach \
+    dua_interfaces/action/Reach \
+      "{ \
+        target_pose: { \
+          header: {frame_id: map}, \
+          pose: { \
+            position: {x: $1, y: $2, z: $3}, \
+            orientation: { \
+              w: $(python3 -c "import math; print(math.cos($yaw_rad/2.0))"), \
+              x: 0.0, \
+              y: 0.0, \
+              z: $(python3 -c "import math; print(math.sin($yaw_rad/2.0))") \
+            } \
+          } \
+       },
+       reach_radius: $5, \
+       stop_at_target: true \
+      }"
+}
+
+# Performs a turn to the desired heading
+function turn {
+  # Check input arguments
+  if [[ $# -ne 1 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    turn YAW"
+    echo >&2 "YAW must be in [-180° +180°]."
+    return 1
+  fi
+
+  ros2 action send_goal -f "$NAMESPACE"/flight_stack/flight_control/turn dua_interfaces/action/Turn "{header: {frame_id: map}, heading: $(degrad "$1")}"
+}
+
+# Requests a navigation to reach a target position
+function navigate {
+  # Check input arguments
+  if [[ $# -ne 3 && $# -ne 4 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    navigate X Y Z [YAW]"
+    echo >&2 "XYZ must be w.r.t. WORLD reference frame"
+    return 1
+  fi
+
+  local yaw_rad
+  if [[ $# -eq 4 ]]; then
+    yaw_rad="$(degrad "$4")"
+  else
+    yaw_rad=6.28
+  fi
+
+  ros2 action send_goal -f "$NAMESPACE"/navigation_stack/navigator/navigate dua_interfaces/action/Navigate "{header: {frame_id: map}, target: {x: $1, y: $2, z: $3}, heading: $yaw_rad}"
+}
+
+# Requests an exploration of the environment
+function explore {
+  # Check input arguments
+  if [[ $# -ne 1 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    explore true/false"
+    return 1
+  fi
+  ros2 action send_goal -f "$NAMESPACE"/navigation_stack/explorer/explore dua_interfaces/action/Explore "{first: $1}"
+}
+
+# Send a go point for the exploration
+function go_point {
+  # Check input arguments
+  if [[ $# -ne 4 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    go_point X Y Z YAW"
+    return 1
+  fi
+
+  local yaw_rad
+  yaw_rad="$(degrad "$4")"
+
+  ros2 topic pub --once \
+    "$NAMESPACE"/navigation_stack/explorer/go_point \
+    geometry_msgs/msg/PoseStamped \
+      "{ \
+        header: {frame_id: map}, \
+        pose: { \
+          position: {x: $1, y: $2, z: $3}, \
+          orientation: { \
+            w: $(python3 -c "import math; print(math.cos($yaw_rad/2.0))"), \
+            x: 0.0, \
+            y: 0.0, \
+            z: $(python3 -c "import math; print(math.sin($yaw_rad/2.0))") \
+          } \
+        } \
+      }"
+}
+
+# Requests a tracking
+function track {
+  # Check input arguments
+  if [[ $# -ne 3 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    track ID STOP SIDE"
+    return 1
+  fi
+  ros2 action send_goal -f "$NAMESPACE"/navigation_stack/tracker/track dua_interfaces/action/Track "{target_id: $1, stop_when_centered: $2, start_side: $3}"
+}
+
+# Requests a tracking
+function aruco_track {
+  # Check input arguments
+  if [[ $# -ne 3 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    aruco_track ID STOP SIDE"
+    return 1
+  fi
+  ros2 action send_goal -f "$NAMESPACE"/navigation_stack/aruco_tracker/track dua_interfaces/action/Track "{target_id: $1, stop_when_centered: $2, start_side: $3}"
+}
+
+# Requests a tracking
+function object_track {
+  # Check input arguments
+  if [[ $# -ne 3 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    object_track ID STOP SIDE"
+    return 1
+  fi
+  ros2 action send_goal -f "$NAMESPACE"/navigation_stack/object_tracker/track dua_interfaces/action/Track "{target_id: $1, stop_when_centered: $2, start_side: $3}"
+}
+
+# Requests a tracking
+function collimate {
+  # Check input arguments
+  if [[ $# -ne 4 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    collimate ALIGN LAND ALTITUDE MINIMUMS"
+    return 1
+  fi
+  ros2 action send_goal -f "$NAMESPACE"/collimator/precision_landing dua_interfaces/action/PrecisionLanding "{align: $1, land: $2, altitude: $3, minimums: $4}"
+}
+
+function collada {
+
+  if [[ $# -ne 1 ]]; then
+    echo >&2 "Usage:"
+    echo >&2 "    collada NAME"
+    return 1
+  fi
+
+  ros2 topic pub /collada visualization_msgs/msg/Marker \
+  "{
+    header: {
+        frame_id: 'map',
+        stamp: {sec: 0, nanosec: 0}
+    },
+    id: 0,
+    type: 10,
+    action: 0,
+    pose: {
+        position: {x: 5.0, y: 5.0, z: 0.0},
+        orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+    },
+    scale: {x: 1.0, y: 1.0, z: 1.0},
+    color: {r: 1.0, g: 1.0, b: 1.0, a: 1.0},
+    mesh_resource: 'file:////home/neo/workspace/src/gcs_bringup/dae/$1.dae',
+    mesh_use_embedded_materials: true
+  }"
+}

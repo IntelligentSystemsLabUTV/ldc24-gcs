@@ -77,4 +77,10 @@ def generate_launch_description():
         output='screen')
     ld.add_action(rviz)
 
+    rqt = ExecuteProcess(
+        cmd=['rqt', '-p', 'LDC24'],
+        emulate_tty=True,
+        output='screen')
+    ld.add_action(rqt)
+
     return ld

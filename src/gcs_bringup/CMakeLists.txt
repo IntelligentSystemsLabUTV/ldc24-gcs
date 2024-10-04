@@ -6,11 +6,7 @@ find_package(arianna_description REQUIRED)
 find_package(dottorcane_description REQUIRED)
 
 # Install Launch files
-install(DIRECTORY launch
-  DESTINATION share/${PROJECT_NAME})
-
-# Install RViz files
-install(DIRECTORY rviz
+install(DIRECTORY launch rviz dae
   DESTINATION share/${PROJECT_NAME})
 
 ament_package()
