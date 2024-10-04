@@ -21,7 +21,6 @@ September 28, 2024
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import json
 
 import cv2 as cv
@@ -31,11 +30,6 @@ import rclpy
 import rclpy.time
 from rclpy.duration import Duration
 from rclpy.node import Node
-
-from scipy.spatial.transform import Rotation as R
-
-from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
 
 from dua_interfaces.msg import VisualTargets
 from geometry_msgs.msg import Point, PointStamped, Pose, PoseStamped, TransformStamped, Vector3
@@ -47,7 +41,7 @@ from std_msgs.msg import Empty, Header, String
 from vision_msgs.msg import Detection2D, Detection2DArray
 from visualization_msgs.msg import Marker, MarkerArray
 
-from dua_interfaces.srv import SafeLanding
+from dua_interfaces.srv import TransformPose, GetTransform, SafeLanding
 from rcl_interfaces.srv import SetParameters
 from std_srvs.srv import SetBool, Trigger
 
@@ -123,7 +117,6 @@ class GCSFSMNode(Node):
 
         # Initialize ROS 2 entities
         self._init_parameters()
-        self._init_tf2()
         self._init_publishers()
         self._init_service_clients()
         self._init_action_clients()
@@ -366,13 +359,6 @@ class GCSFSMNode(Node):
             'wait_servers').get_parameter_value().bool_value
         self.get_logger().info(f'Wait for servers: {self.wait_servers}')
 
-    def _init_tf2(self) -> None:
-        """
-        Initialize TF2 entities.
-        """
-        self._tf_buffer = Buffer()
-        self._tf_listener = TransformListener(self._tf_buffer, self)
-
     def _init_publishers(self) -> None:
         """
         Initialize topic publishers.
@@ -465,6 +451,20 @@ class GCSFSMNode(Node):
             self,
             SetParameters,
             '/dottorcane/position_controller/set_parameters',
+            self.wait_servers)
+
+        # dottorcane/navigation_stack/navigator/transform_pose
+        self.transform_pose_client = ServiceClient(
+            self,
+            TransformPose,
+            '/dottorcane/navigation_stack/navigator/transform_pose',
+            self.wait_servers)
+
+        # dottorcane/navigation_stack/navigator/get_transform
+        self.get_transform_client = ServiceClient(
+            self,
+            GetTransform,
+            '/dottorcane/navigation_stack/navigator/get_transform',
             self.wait_servers)
 
     def _init_action_clients(self) -> None:
@@ -587,17 +587,13 @@ class GCSFSMNode(Node):
         :param agent: Agent name.
         :return: Current pose.
         """
-        transform = TransformStamped()
-        while True:
-            try:
-                transform = self._tf_buffer.lookup_transform(
-                    'map',
-                    agent + '/base_link',
-                    rclpy.time.Time(),
-                    self.tf_timeout)
-                break
-            except:
-                continue
+        tf_req: GetTransform.Request = GetTransform.Request(
+            frame='map',
+            child_frame= agent + '/base_link',
+            time=self.get_clock().now().to_msg()
+        )
+        tf_resp: GetTransform.Response = self.get_transform_client.call_sync(tf_req)
+        transform: TransformStamped = tf_resp.transform
 
         curr_pose = PoseStamped(
             header=Header(
@@ -611,7 +607,7 @@ class GCSFSMNode(Node):
                 orientation=transform.transform.rotation))
         return curr_pose
 
-    def get_target_pose(self, target_data: Detection2D) -> Pose:
+    def get_target_pose(self, target_data: Detection2D) -> PoseStamped:
         """
         Returns the pose of a target in the global frame.
 
@@ -620,54 +616,21 @@ class GCSFSMNode(Node):
         """
         tgt_frame = target_data.header.frame_id
         tgt_pose: Pose = target_data.results[0].pose.pose
-        target_tf = TransformStamped()
-        while True:
-            try:
-                target_tf = self._tf_buffer.lookup_transform(
-                    'map',
-                    tgt_frame,
-                    rclpy.time.Time(),
-                    self.tf_timeout)
-                break
-            except:
-                continue
-
-        q_tf = [target_tf.transform.rotation.x,
-                target_tf.transform.rotation.y,
-                target_tf.transform.rotation.z,
-                target_tf.transform.rotation.w]
-        rot_tf = R.from_quat(q_tf).as_matrix()
-        vec_tf = np.array([target_tf.transform.translation.x,
-                           target_tf.transform.translation.y,
-                           target_tf.transform.translation.z])
-        iso_tf = np.eye(4)
-        iso_tf[:3, :3] = rot_tf
-        iso_tf[:3, 3] = vec_tf
-
-        q_tgt = [tgt_pose.orientation.x,
-                 tgt_pose.orientation.y,
-                 tgt_pose.orientation.z,
-                 tgt_pose.orientation.w]
-        rot_tgt = R.from_quat(q_tgt).as_matrix()
-        vec_tgt = np.array([tgt_pose.position.x,
-                            tgt_pose.position.y,
-                            tgt_pose.position.z])
-        iso_tgt = np.eye(4)
-        iso_tgt[:3, :3] = rot_tgt
-        iso_tgt[:3, 3] = vec_tgt
-
-        iso_tgt_map = np.matmul(iso_tf, iso_tgt)
-        q_tgt_map = R.from_matrix(iso_tgt_map[:3, :3]).as_quat()
-
-        tgt_pose_map: Pose = Pose()
-        tgt_pose_map.position.x = iso_tgt_map[0, 3]
-        tgt_pose_map.position.y = iso_tgt_map[1, 3]
-        tgt_pose_map.position.z = iso_tgt_map[2, 3]
-        tgt_pose_map.orientation.x = q_tgt_map[0]
-        tgt_pose_map.orientation.y = q_tgt_map[1]
-        tgt_pose_map.orientation.z = q_tgt_map[2]
-        tgt_pose_map.orientation.w = q_tgt_map[3]
-        return tgt_pose_map
+        # self.get_logger().info(f'Target frame: {tgt_frame}, x: {tgt_pose.position.x}, y: {tgt_pose.position.y}, z: {tgt_pose.position.z}')
+        tgt_pose_stamped = PoseStamped(
+            header=Header(
+                stamp=target_data.header.stamp,
+                frame_id=tgt_frame
+            ),
+            pose=tgt_pose
+        )
+        req: TransformPose.Request = TransformPose.Request(
+            pose=tgt_pose_stamped,
+            target_frame='map'
+        )
+        res: TransformPose.Response = self.transform_pose_client.call_sync(req)
+        # self.get_logger().info(f'Target transformed to {res.transformed_pose.header.frame_id}: x: {res.transformed_pose.pose.position.x}, y: {res.transformed_pose.pose.position.y}, z: {res.transformed_pose.pose.position.z}')
+        return res.transformed_pose
 
     def set_followme_parameters(self, pre: bool) -> bool:
         """
