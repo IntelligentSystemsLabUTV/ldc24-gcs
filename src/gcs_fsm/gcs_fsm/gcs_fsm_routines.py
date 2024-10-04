@@ -84,6 +84,8 @@ def init_routine(node: GCSFSMNode) -> str:
                 if id not in range(101, 500):
                     node.get_logger().warn(f'ID out of legal range: {id}')
                 else:
+                    # These must be found two times!
+                    node.valid_ids.append("ArUco " + str(id))
                     node.valid_ids.append("ArUco " + str(id))
     else:
         node.get_logger().warn("No ArUco markers specified")
