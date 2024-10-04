@@ -98,6 +98,8 @@ class GCSFSMNode(Node):
         self.followme_done = False
         self.valid_ids = []
         self.rtb_id = ''
+        self.start = False
+        self.stop = False
         self.emergency_landing_id = ''
         self.followme_start_time = 0.0
         self.followme_waypoints = []
@@ -515,6 +517,36 @@ class GCSFSMNode(Node):
             '/hmi/found_targets/visual',
             self._found_targets_visual_callback,
             dua_qos.get_datum_qos())
+
+        # /start
+        self._start_sub = self.create_subscription(
+            Empty,
+            '/start',
+            self._start_callback,
+            dua_qos.get_datum_qos())
+
+        # /stop
+        self._stop_sub = self.create_subscription(
+            Empty,
+            '/stop',
+            self._stop_callback,
+            dua_qos.get_datum_qos())
+
+    def _start_callback(self, msg: Empty) -> None:
+        """
+        Start mission callback.
+
+        :param msg: Message to parse.
+        """
+        self.start = True
+
+    def _stop_callback(self, msg: Empty) -> None:
+        """
+        Stop mission callback.
+
+        :param msg: Message to parse.
+        """
+        self.stop = True
 
     def _found_targets_visual_callback(self, msg: VisualTargets) -> None:
         """

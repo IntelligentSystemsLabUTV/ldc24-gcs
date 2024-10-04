@@ -59,8 +59,6 @@ def init_routine(node: GCSFSMNode) -> str:
         mission_data = json.load(f)
     mission_data_hr = json.dumps(mission_data, indent=4)
     print(mission_data_hr)
-    print('Press Enter to confirm mission data...')
-    input()
     with open('/home/neo/workspace/logs/mission.json', 'r') as f:
         mission_data = json.load(f)
 
@@ -71,13 +69,22 @@ def init_routine(node: GCSFSMNode) -> str:
     if 'markers' in mission_data:
         if 'uav' in mission_data['markers']:
             for id in mission_data['markers']['uav']:
-                node.valid_ids.append("ArUco " + str(id))
+                if id not in range(101, 500):
+                    node.get_logger().warn(f'ID out of legal range: {id}')
+                else:
+                    node.valid_ids.append("ArUco " + str(id))
         if 'ugv' in mission_data['markers']:
             for id in mission_data['markers']['ugv']:
-                node.valid_ids.append("ArUco " + str(id))
+                if id not in range(101, 500):
+                    node.get_logger().warn(f'ID out of legal range: {id}')
+                else:
+                    node.valid_ids.append("ArUco " + str(id))
         if 'uxv' in mission_data['markers']:
             for id in mission_data['markers']['uxv']:
-                node.valid_ids.append("ArUco " + str(id))
+                if id not in range(101, 500):
+                    node.get_logger().warn(f'ID out of legal range: {id}')
+                else:
+                    node.valid_ids.append("ArUco " + str(id))
     else:
         node.get_logger().warn("No ArUco markers specified")
 
@@ -104,15 +111,23 @@ def init_routine(node: GCSFSMNode) -> str:
     key = 'emergency' if 'emergency' in mission_data else 'emergency_task'
     if key in mission_data:
         if 'landing' in mission_data[key]:
-            node.emergency_landing_id = "ArUco " + str(mission_data[key]['landing'])
+            if mission_data[key]['landing'] not in range(101, 500):
+                node.get_logger().warn(f'Emergency task ID out of legal range: {mission_data[key]["landing"]}')
+            else:
+                node.emergency_landing_id = "ArUco " + str(mission_data[key]['landing'])
         if 'RTB' in mission_data[key]:
-            node.rtb_id = "ArUco " + str(mission_data[key]['RTB'])
+            if mission_data[key]['RTB'] not in range(101, 500):
+                node.get_logger().warn(f'Emergency task ID out of legal range: {mission_data[key]["RTB"]}')
+            else:
+                node.rtb_id = "ArUco " + str(mission_data[key]['RTB'])
     else:
         node.get_logger().warn("No emergency tasks specified")
 
     # Wait second confirmation
-    print('Press Enter to confirm mission start...')
-    input()
+    print('Press START button on HMI to confirm mission start...')
+    node.start = False
+    while not node.start:
+        node.wait_spinning()
 
     # Open log file
     node.open_log(manche)
@@ -138,7 +153,9 @@ def explore_routine(node: GCSFSMNode) -> str:
     while True:
         # Check exit conditions
         if len(node.valid_ids) == 0 and node.followme_done:
-            time.sleep(5) # Just in case...
+            next_trigger = 'stop'
+            break
+        if node.stop:
             next_trigger = 'stop'
             break
         if node.followme:
@@ -152,11 +169,7 @@ def explore_routine(node: GCSFSMNode) -> str:
             break
 
         # Wait for updates
-        try:
-            node.wait_spinning()
-        except KeyboardInterrupt:
-            next_trigger = 'stop'
-            break
+        node.wait_spinning()
 
     node.get_logger().info('Exploration stopped')
     return next_trigger
