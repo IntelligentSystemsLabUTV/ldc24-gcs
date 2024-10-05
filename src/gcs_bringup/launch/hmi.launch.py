@@ -70,17 +70,10 @@ def generate_launch_description():
         'rviz',
         'hmi.rviz'
     )
-
     rviz = ExecuteProcess(
         cmd=['rviz2', '-d', rviz_config],
         emulate_tty=True,
         output='screen')
     ld.add_action(rviz)
-
-    # rqt = ExecuteProcess(
-    #     cmd=['rqt', '-p', 'LDC24'],
-    #     emulate_tty=True,
-    #     output='screen')
-    # ld.add_action(rqt)
 
     return ld

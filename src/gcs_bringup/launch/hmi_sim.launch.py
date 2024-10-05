@@ -68,19 +68,12 @@ def generate_launch_description():
     rviz_config = os.path.join(
         get_package_share_directory('gcs_bringup'),
         'rviz',
-        'hmi.rviz'
+        'hmi_sim.rviz'
     )
-
     rviz = ExecuteProcess(
         cmd=['rviz2', '-d', rviz_config],
         emulate_tty=True,
         output='screen')
     ld.add_action(rviz)
-
-    # rqt = ExecuteProcess(
-    #     cmd=['rqt', '-p', 'LDC24'],
-    #     emulate_tty=True,
-    #     output='screen')
-    # ld.add_action(rqt)
 
     return ld

@@ -41,9 +41,10 @@ void VisualTargetsDisplay::onInitialize()
 
 void VisualTargetsDisplay::processMessage(dua_interfaces::msg::VisualTargets::ConstSharedPtr msg)
 {
+  // Clear the server
   mutex_.lock();
   server_->clear();
-  // Check if the fame id contains "arianna" or "dottorcane" and store the images in the corresponding map
+  // Parse the agent name from the frame_id
   std::string frame_id = msg->targets.header.frame_id;
   std::string agent = "";
   if (frame_id.find("arianna") != std::string::npos) {
@@ -55,12 +56,17 @@ void VisualTargetsDisplay::processMessage(dua_interfaces::msg::VisualTargets::Co
     if (!detection.results.empty()) {
       std::string id = detection.results[0].hypothesis.class_id;
       std::replace(id.begin(), id.end(), ' ', '_');
-      map_[id].push_back(
-        std::pair<std::string, sensor_msgs::msg::Image>(
-          agent, msg->image));
-      createInteractiveMarker(detection.results[0].pose.pose, id);
+      const Info info = {agent, detection.results[0].pose.pose, msg->image};
+      map_[id].push_back(info);
     }
   }
+  for (const auto & entry : map_) {
+    const auto & id = entry.first;
+    const Info & infos = entry.second[0];
+    const Pose & pose = std::get<1>(infos);
+    createInteractiveMarker(pose, id);
+  }
+  // Update the server
   server_->applyChanges();
   mutex_.unlock();
 }
@@ -69,38 +75,49 @@ void VisualTargetsDisplay::createInteractiveMarker(
   const geometry_msgs::msg::Pose & pose,
   const std::string & id)
 {
-  // Create a marker for the COLLADA model
-  visualization_msgs::msg::Marker mesh_marker;
-  mesh_marker.header.set__stamp(rclcpp::Time(0));
-  mesh_marker.header.set__frame_id("map");
-  mesh_marker.set__type(visualization_msgs::msg::Marker::MESH_RESOURCE);
-  mesh_marker.set__action(visualization_msgs::msg::Marker::ADD);
-  mesh_marker.set__pose(pose);
-  mesh_marker.scale.set__x(1.0);
-  mesh_marker.scale.set__y(1.0);
-  mesh_marker.scale.set__z(1.0);
-  mesh_marker.color.set__r(1.0);
-  mesh_marker.color.set__g(1.0);
-  mesh_marker.color.set__b(1.0);
-  mesh_marker.color.set__a(1.0);
-  std::string mesh_resource = "file:////home/neo/workspace/src/gcs_bringup/dae/" + id + ".dae";
-  mesh_marker.set__mesh_resource(mesh_resource);
-  mesh_marker.set__mesh_use_embedded_materials(true);
+  visualization_msgs::msg::Marker marker;
+  marker.header.set__stamp(rclcpp::Time(0));
+  marker.header.set__frame_id("map");
+  marker.set__action(visualization_msgs::msg::Marker::ADD);
+  marker.pose.set__position(pose.position);
+  if (id.find("ArUco") != std::string::npos) {
+    // Create a marker for the ArUco marker
+    marker.set__type(visualization_msgs::msg::Marker::SPHERE);
+    marker.scale.set__x(1.0);
+    marker.scale.set__y(1.0);
+    marker.scale.set__z(1.0);
+    marker.color.set__r(1.0);
+    marker.color.set__g(0.0);
+    marker.color.set__b(0.0);
+    marker.color.set__a(1.0);
+  } else {
+    // Create a marker for the COLLADA model
+    marker.set__type(visualization_msgs::msg::Marker::MESH_RESOURCE);
+    marker.scale.set__x(1.0);
+    marker.scale.set__y(1.0);
+    marker.scale.set__z(1.0);
+    marker.color.set__r(1.0);
+    marker.color.set__g(1.0);
+    marker.color.set__b(1.0);
+    marker.color.set__a(1.0);
+    std::string mesh_resource = "file:////home/neo/workspace/src/gcs_bringup/dae/" + id + ".dae";
+    marker.set__mesh_resource(mesh_resource);
+    marker.set__mesh_use_embedded_materials(true);
+  }
 
   // Create a control for the marker
   visualization_msgs::msg::InteractiveMarkerControl mesh_control;
   mesh_control.set__name(id);
-  mesh_control.set__orientation(pose.orientation);
   mesh_control.set__orientation_mode(visualization_msgs::msg::InteractiveMarkerControl::FIXED);
   mesh_control.set__interaction_mode(visualization_msgs::msg::InteractiveMarkerControl::BUTTON);
   mesh_control.set__always_visible(true);
-  mesh_control.markers.push_back(mesh_marker);
+  mesh_control.markers.push_back(marker);
 
   // Create an interactive marker
   visualization_msgs::msg::InteractiveMarker int_marker;
   int_marker.header.set__stamp(rclcpp::Time(0));
   int_marker.header.set__frame_id("map");
-  int_marker.set__pose(pose);
+  int_marker.pose.set__position(pose.position);
   int_marker.set__name(id);
   int_marker.set__description(id);
   int_marker.set__scale(0.75);
@@ -135,19 +152,18 @@ void VisualTargetsDisplay::showImage(const std::string & id)
   std::string class_id = id;
   std::replace(class_id.begin(), class_id.end(), '_', ' ');
   std::transform(class_id.begin(), class_id.end(), class_id.begin(), ::toupper);
-  class_id = "<font size=5><b>" + class_id + "</b></font>";
   dialog->setWindowTitle(QString::fromStdString(class_id));
   // Create a layout to display the images
-  const std::vector<std::pair<std::string, sensor_msgs::msg::Image>> & pairs = map_[id];
-  if (pairs.empty()) {
+  const Infos & infos = map_[id];
+  if (infos.empty()) {
     mutex_.unlock();
     return;
   }
   // Iterate over the images and create a label for each image
   QHBoxLayout * main_layout = new QHBoxLayout(dialog);
-  for (const auto & pair : pairs) {
+  for (const Info & info : infos) {
     // Convert sensor_msgs::msg::Image to QImage
-    auto image = pair.second;
+    const sensor_msgs::msg::Image & image = std::get<2>(info);
     QImage qimage;
     const auto & encoding = image.encoding;
     if (encoding == sensor_msgs::image_encodings::RGB8) {
@@ -185,20 +201,14 @@ void VisualTargetsDisplay::showImage(const std::string & id)
         QImage::Format_RGBA8888);
       qimage = temp.rgbSwapped();
     } else {
-      // Log a warning using RCLCPP_WARN
-      RCLCPP_WARN(
-        rviz_ros_node_.lock()->get_raw_node()->get_logger(),
-        "Unsupported image encoding: %s",
-        encoding.c_str());
       continue;
     }
     // Ensure the image data is copied since the original data may be released
     qimage = qimage.copy();
     // Vertical layout for the agent name and image
     QVBoxLayout * layout = new QVBoxLayout();
-    // Create a label to display the agent name
     QLabel * agent_label = new QLabel(dialog);
-    agent_label->setText(QString::fromStdString(pair.first));
+    agent_label->setText(QString::fromStdString(std::get<0>(info)));
     agent_label->setAlignment(Qt::AlignCenter);
     layout->addWidget(agent_label);
     // Create a label to display the image

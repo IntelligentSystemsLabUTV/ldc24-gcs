@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include <QDialog>
 #include <QImage>
@@ -24,6 +25,12 @@
 
 namespace rviz_custom_plugins
 {
+
+using geometry_msgs::msg::Pose;
+using sensor_msgs::msg::Image;
+
+typedef std::tuple<std::string, Pose, Image> Info;
+typedef std::vector<Info> Infos;
 
 class VisualTargetsDisplay
   : public rviz_common::RosTopicDisplay<dua_interfaces::msg::VisualTargets>
@@ -48,8 +55,7 @@ private:
   void showImage(const std::string & id);
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-  std::unordered_map<std::string,
-    std::vector<std::pair<std::string, sensor_msgs::msg::Image>>> map_;
+  std::unordered_map<std::string, Infos> map_;
   std::mutex mutex_;
 };
 
