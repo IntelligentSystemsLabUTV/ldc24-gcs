@@ -48,7 +48,8 @@ private:
   void showImage(const std::string & id);
 
   std::shared_ptr<interactive_markers::InteractiveMarkerServer> server_;
-  std::unordered_map<std::string, std::vector<sensor_msgs::msg::Image>> map_;
+  std::unordered_map<std::string,
+    std::vector<std::pair<std::string, sensor_msgs::msg::Image>>> map_;
   std::mutex mutex_;
 };
 

@@ -43,11 +43,21 @@ void VisualTargetsDisplay::processMessage(dua_interfaces::msg::VisualTargets::Co
 {
   mutex_.lock();
   server_->clear();
+  // Check if the fame id contains "arianna" or "dottorcane" and store the images in the corresponding map
+  std::string frame_id = msg->targets.header.frame_id;
+  std::string agent = "";
+  if (frame_id.find("arianna") != std::string::npos) {
+    agent = "Arianna";
+  } else if (frame_id.find("dottorcane") != std::string::npos) {
+    agent = "DottorCane";
+  }
   for (const auto & detection : msg->targets.detections) {
     if (!detection.results.empty()) {
       std::string id = detection.results[0].hypothesis.class_id;
       std::replace(id.begin(), id.end(), ' ', '_');
-      map_[id].push_back(msg->image);
+      map_[id].push_back(
+        std::pair<std::string, sensor_msgs::msg::Image>(
+          agent, msg->image));
       createInteractiveMarker(detection.results[0].pose.pose, id);
     }
   }
@@ -93,7 +103,7 @@ void VisualTargetsDisplay::createInteractiveMarker(
   int_marker.set__pose(pose);
   int_marker.set__name(id);
   int_marker.set__description(id);
-  int_marker.set__scale(1.0);
+  int_marker.set__scale(0.75);
   int_marker.controls.push_back(mesh_control);
 
   // Insert the interactive marker into the server and set the callback
@@ -125,18 +135,19 @@ void VisualTargetsDisplay::showImage(const std::string & id)
   std::string class_id = id;
   std::replace(class_id.begin(), class_id.end(), '_', ' ');
   std::transform(class_id.begin(), class_id.end(), class_id.begin(), ::toupper);
-  QString title = "<b><font size='10'>" + QString::fromStdString(class_id) + "</font></b>";
-  dialog->setWindowTitle(title);
+  class_id = "<font size=5><b>" + class_id + "</b></font>";
+  dialog->setWindowTitle(QString::fromStdString(class_id));
   // Create a layout to display the images
-  const std::vector<sensor_msgs::msg::Image> & images = map_[id];
-  if (images.empty()) {
+  const std::vector<std::pair<std::string, sensor_msgs::msg::Image>> & pairs = map_[id];
+  if (pairs.empty()) {
     mutex_.unlock();
     return;
   }
   // Iterate over the images and create a label for each image
   QHBoxLayout * main_layout = new QHBoxLayout(dialog);
-  for (const auto & image : images) {
+  for (const auto & pair : pairs) {
     // Convert sensor_msgs::msg::Image to QImage
+    auto image = pair.second;
     QImage qimage;
     const auto & encoding = image.encoding;
     if (encoding == sensor_msgs::image_encodings::RGB8) {
@@ -183,12 +194,20 @@ void VisualTargetsDisplay::showImage(const std::string & id)
     }
     // Ensure the image data is copied since the original data may be released
     qimage = qimage.copy();
+    // Vertical layout for the agent name and image
+    QVBoxLayout * layout = new QVBoxLayout();
+    // Create a label to display the agent name
+    QLabel * agent_label = new QLabel(dialog);
+    agent_label->setText(QString::fromStdString(pair.first));
+    agent_label->setAlignment(Qt::AlignCenter);
+    layout->addWidget(agent_label);
     // Create a label to display the image
     QLabel * image_label = new QLabel(dialog);
     image_label->setPixmap(QPixmap::fromImage(qimage));
     image_label->setAlignment(Qt::AlignCenter);
-    // Add the label to the layout
-    main_layout->addWidget(image_label);
+    layout->addWidget(image_label);
+    // Add the layout to the main layout
+    main_layout->addLayout(layout);
   }
   // Set the layout for the dialog
   dialog->setLayout(main_layout);

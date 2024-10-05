@@ -204,9 +204,9 @@ function collimate {
 
 function visual_targets {
 
-  if [[ $# -ne 4 ]]; then
+  if [[ $# -ne 5 ]]; then
     echo >&2 "Usage:"
-    echo >&2 "    taregts ID X Y Z"
+    echo >&2 "    taregts AGENT ID X Y Z"
     return 1
   fi
 
@@ -214,7 +214,7 @@ function visual_targets {
     targets: {
       header: {
         stamp: {sec: 0, nanosec: 0},
-        frame_id: 'map'
+        frame_id: '$1'
       },
       detections: [
         {
@@ -225,12 +225,12 @@ function visual_targets {
           results: [
             {
               hypothesis: {
-                class_id: '$1',
+                class_id: '$2',
                 score: 0.95
               },
               pose: {
                 pose: {
-                  position: { x: $2, y: $3, z: $4 },
+                  position: { x: $3, y: $4, z: $5 },
                   orientation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }
                 }
               }
