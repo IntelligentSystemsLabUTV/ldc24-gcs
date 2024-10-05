@@ -4,14 +4,14 @@
       A panel that displays a button
     </description>
   </class>
-  <class name="InteractiveMarker" type="rviz_custom_plugins::InteractiveMarker" base_class_type="rviz_common::Display">
-    <description>
-      A display that shows an interactive marker.
-    </description>
-  </class>
   <class name="OverlayTextPanel" type="rviz_custom_plugins::OverlayTextPanel" base_class_type="rviz_common::Panel">
     <description>
       A panel that displays text from a ROS 2 topic.
+    </description>
+  </class>
+  <class name="VisualTargetsDisplay" type="rviz_custom_plugins::VisualTargetsDisplay" base_class_type="rviz_common::Display">
+    <description>
+      A display that shows an interactive marker.
     </description>
   </class>
 </library>

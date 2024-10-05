@@ -202,30 +202,63 @@ function collimate {
   ros2 action send_goal -f "$NAMESPACE"/collimator/precision_landing dua_interfaces/action/PrecisionLanding "{align: $1, land: $2, altitude: $3, minimums: $4}"
 }
 
-function collada {
+function visual_targets {
 
-  if [[ $# -ne 1 ]]; then
+  if [[ $# -ne 4 ]]; then
     echo >&2 "Usage:"
-    echo >&2 "    collada NAME"
+    echo >&2 "    taregts ID X Y Z"
     return 1
   fi
 
-  ros2 topic pub /collada visualization_msgs/msg/Marker \
-  "{
-    header: {
-        frame_id: 'map',
-        stamp: {sec: 0, nanosec: 0}
+  ros2 topic pub --once /visual_targets dua_interfaces/msg/VisualTargets "{
+    targets: {
+      header: {
+        stamp: {sec: 0, nanosec: 0},
+        frame_id: 'map'
+      },
+      detections: [
+        {
+          header: {
+            stamp: {sec: 0, nanosec: 0},
+            frame_id: 'map'
+          },
+          results: [
+            {
+              hypothesis: {
+                class_id: '$1',
+                score: 0.95
+              },
+              pose: {
+                pose: {
+                  position: { x: $2, y: $3, z: $4 },
+                  orientation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }
+                }
+              }
+            }
+          ],
+          bbox: {
+            center: {
+              position: { x: 5.0, y: 5.0 },
+              theta: 0.0
+            },
+            size_x: 2.0,
+            size_y: 2.0
+          },
+          id: '$1'
+        }
+      ]
     },
-    id: 0,
-    type: 10,
-    action: 0,
-    pose: {
-        position: {x: 5.0, y: 5.0, z: 0.0},
-        orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-    },
-    scale: {x: 1.0, y: 1.0, z: 1.0},
-    color: {r: 1.0, g: 1.0, b: 1.0, a: 1.0},
-    mesh_resource: 'file:////home/neo/workspace/src/gcs_bringup/dae/$1.dae',
-    mesh_use_embedded_materials: true
+    image: {
+      header: {
+        stamp: {sec: 0, nanosec: 0},
+        frame_id: 'map'
+      },
+      height: 100,
+      width: 100,
+      encoding: 'bgr8',
+      is_bigendian: 0,
+      step: 300,
+      data: [$(python3 -c 'print(", ".join(["0"]*(100*100*3)))')]
+    }
   }"
 }
