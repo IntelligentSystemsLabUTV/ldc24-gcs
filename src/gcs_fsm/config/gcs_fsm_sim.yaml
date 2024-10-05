@@ -7,7 +7,7 @@
       - 1.0
     followme_reach_radius:
       - 1.0
-      - 0.7
+      - 0.4
     landing_altitude: 1.5
     tf_timeout: 500.0
     use_sim_time: true
