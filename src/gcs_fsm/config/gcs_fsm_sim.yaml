@@ -1,0 +1,14 @@
+/gcs/fsm:
+  ros__parameters:
+    do_emergency_landing: true
+    event_polling_period: 0.2
+    followme_kp_yaw:
+      - 2.0
+      - 1.0
+    followme_reach_radius:
+      - 1.0
+      - 0.7
+    landing_altitude: 1.5
+    tf_timeout: 500.0
+    use_sim_time: true
+    wait_servers: true

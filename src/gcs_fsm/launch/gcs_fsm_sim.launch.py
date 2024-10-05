@@ -1,10 +1,10 @@
 """
-GCS FSM app launch file.
+GCS FSM app launch file for simulation.
 
 Roberto Masocco <robmasocco@gmail.com>
 Intelligent Systems Lab <isl.torvergata@gmail.com>
 
-September 28, 2024
+October 5, 2024
 """
 
 # Copyright 2024 Intelligent Systems Lab
@@ -33,7 +33,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     # Build config file path
-    config = os.path.join(get_package_share_directory('gcs_fsm'), 'config', 'gcs_fsm.yaml')
+    config = os.path.join(get_package_share_directory('gcs_fsm'), 'config', 'gcs_fsm_sim.yaml')
 
     # Set environment variables
     rmw_env_var = SetEnvironmentVariable(
