@@ -205,6 +205,7 @@ def followme_routine(node: GCSFSMNode) -> str:
         if res2.success:
             break
         time.sleep(0.2)
+    time.sleep(2.0)
     node.get_logger().info('UGV in FOLLOW_ME')
 
     # Send agents to FollowMe start point
@@ -407,6 +408,7 @@ def rtb_routine(node: GCSFSMNode) -> str:
             break
         time.sleep(0.2)
     node.get_logger().info('UGV in RTB')
+    time.sleep(2.0)
     node.log('RTB started')
 
     # Send agents back to base
