@@ -69,19 +69,19 @@ def init_routine(node: GCSFSMNode) -> str:
     if 'markers' in mission_data:
         if 'uav' in mission_data['markers']:
             for id in mission_data['markers']['uav']:
-                if id not in range(101, 500):
+                if int(id) not in range(101, 500):
                     node.get_logger().warn(f'ID out of legal range: {id}')
                 else:
                     node.valid_ids.append("ArUco " + str(id))
         if 'ugv' in mission_data['markers']:
             for id in mission_data['markers']['ugv']:
-                if id not in range(101, 500):
+                if int(id) not in range(101, 500):
                     node.get_logger().warn(f'ID out of legal range: {id}')
                 else:
                     node.valid_ids.append("ArUco " + str(id))
         if 'uxv' in mission_data['markers']:
             for id in mission_data['markers']['uxv']:
-                if id not in range(101, 500):
+                if int(id) not in range(101, 500):
                     node.get_logger().warn(f'ID out of legal range: {id}')
                 else:
                     # These must be found two times!
@@ -94,10 +94,10 @@ def init_routine(node: GCSFSMNode) -> str:
     if 'object_detection' in mission_data:
         key = 'classes' if 'classes' in mission_data['object_detection'] else 'class'
         for obj in mission_data['object_detection'][key]:
-            if str(obj) not in node.COCO_CLASSES:
-                node.get_logger().fatal(f"Unknown object class: {str(obj)}")
+            if str(obj).replace('_', ' ') not in node.COCO_CLASSES:
+                node.get_logger().fatal(f"Unknown object class: {str(obj).replace('_', ' ')}")
                 return 'error'
-            node.valid_ids.append(str(obj))
+            node.valid_ids.append(str(obj).replace('_', ' '))
     else:
         node.get_logger().warn("No object classes specified")
 
@@ -113,15 +113,15 @@ def init_routine(node: GCSFSMNode) -> str:
     key = 'emergency' if 'emergency' in mission_data else 'emergency_task'
     if key in mission_data:
         if 'landing' in mission_data[key]:
-            if mission_data[key]['landing'] not in range(101, 500):
-                node.get_logger().warn(f'Emergency task ID out of legal range: {mission_data[key]["landing"]}')
+            if int(mission_data[key]['landing']['marker']) not in range(101, 500):
+                node.get_logger().warn(f'Emergency task ID out of legal range: {mission_data[key]["landing"]["marker"]}')
             else:
-                node.emergency_landing_id = "ArUco " + str(mission_data[key]['landing'])
+                node.emergency_landing_id = "ArUco " + str(mission_data[key]['landing']['marker'])
         if 'RTB' in mission_data[key]:
-            if mission_data[key]['RTB'] not in range(101, 500):
-                node.get_logger().warn(f'Emergency task ID out of legal range: {mission_data[key]["RTB"]}')
+            if int(mission_data[key]['RTB']['marker']) not in range(101, 500):
+                node.get_logger().warn(f'Emergency task ID out of legal range: {mission_data[key]["RTB"]["marker"]}')
             else:
-                node.rtb_id = "ArUco " + str(mission_data[key]['RTB'])
+                node.rtb_id = "ArUco " + str(mission_data[key]['RTB']['marker'])
     else:
         node.get_logger().warn("No emergency tasks specified")
 
@@ -248,14 +248,13 @@ def followme_routine(node: GCSFSMNode) -> str:
                 break
             time.sleep(0.2)
         node.get_logger().info('Agents back in control')
-        node.log('FollowMe aborted')
         return 'followme_done'
     node.get_logger().info('FollowMe start goals sent')
 
     # Wait for agents to get to starting point
     dottorcane_res: Navigate.Result = node.dottorcane_navigate_client.get_result_sync(dottorcane_goal_handle)
     arianna_res: Navigate.Result = node.arianna_navigate_client.get_result_sync(arianna_goal_handle)
-    if dottorcane_res.result.result != CommandResultStamped.SUCCESS or arianna_res.result.result != CommandResultStamped.SUCCESS:
+    if dottorcane_res.result.result.result != CommandResultStamped.SUCCESS or arianna_res.result.result.result != CommandResultStamped.SUCCESS:
         node.get_logger().error('Error executing FollowMe')
         # Give back control of agents
         while True:
@@ -269,7 +268,6 @@ def followme_routine(node: GCSFSMNode) -> str:
                 break
             time.sleep(0.2)
         node.get_logger().info('Agents back in control')
-        node.log('FollowMe aborted')
         return 'followme_done'
     node.get_logger().info('Agents at FollowMe start point')
 
@@ -294,7 +292,6 @@ def followme_routine(node: GCSFSMNode) -> str:
                 break
             time.sleep(0.2)
         node.get_logger().info('Agents back in control')
-        node.log('FollowMe aborted')
         return 'followme_done'
     node.get_logger().info('UAV collimation started')
 
@@ -451,14 +448,13 @@ def rtb_routine(node: GCSFSMNode) -> str:
                 break
             time.sleep(0.2)
         node.get_logger().info('Agents back in control')
-        node.log('RTB aborted')
         return 'rtb_done'
     node.get_logger().info('RTB goals sent')
 
     # Wait for agents to get to base
     dottorcane_res: Navigate.Result = node.dottorcane_navigate_client.get_result_sync(dottorcane_goal_handle)
     arianna_res: Navigate.Result = node.arianna_navigate_client.get_result_sync(arianna_goal_handle)
-    if dottorcane_res.result.result != CommandResultStamped.SUCCESS or arianna_res.result.result != CommandResultStamped.SUCCESS:
+    if dottorcane_res.result.result.result != CommandResultStamped.SUCCESS or arianna_res.result.result.result != CommandResultStamped.SUCCESS:
         node.get_logger().error('Error executing RTB')
         # Give back control of agents
         while True:
@@ -472,7 +468,6 @@ def rtb_routine(node: GCSFSMNode) -> str:
                 break
             time.sleep(0.2)
         node.get_logger().info('Agents back in control')
-        node.log('RTB aborted')
         return 'rtb_done'
     node.get_logger().info('Agents at base')
 
@@ -525,6 +520,7 @@ def rtb_routine(node: GCSFSMNode) -> str:
         if res1.success:
             break
         time.sleep(0.2)
+    time.sleep(6.0) # Give UAV time to takeoff again
     while True:
         res2: SetBool.Response = node.dottorcane_rtb_client.call_sync(off_req)
         if res2.success:

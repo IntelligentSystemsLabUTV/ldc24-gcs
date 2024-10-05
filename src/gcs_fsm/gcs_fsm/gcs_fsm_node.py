@@ -105,6 +105,7 @@ class GCSFSMNode(Node):
         self.followme_waypoints = []
         self._color_counter = 0
         self._log_file = None
+        self._mission_started = False
         self._start_time = 0
         self._markers = [
             Marker(
@@ -495,7 +496,7 @@ class GCSFSMNode(Node):
         self.arianna_collimate_client = ActionClient(
             self,
             PrecisionLanding,
-            '/arianna/collimator/collimate',
+            '/arianna/collimator/precision_landing',
             None,
             self.wait_servers)
 
@@ -600,7 +601,7 @@ class GCSFSMNode(Node):
             executor.remove_node(self)
 
         # Check FollowMe time
-        if not self.followme and not self.followme_done:
+        if self._mission_started and not self.followme and not self.followme_done:
             curr_time = self.get_clock().now()
             elapsed_time: Duration = curr_time - self._start_time
             if float(elapsed_time.nanoseconds) / float(1e6) >= (self.followme_start_time * 1000.0):
@@ -719,6 +720,7 @@ class GCSFSMNode(Node):
         self._log_file = open('/home/neo/workspace/logs/mission_log.txt', 'w')
         self._log_file.write(f'--- UNIVERSITY OF ROME TOR VERGATA | MANCHE #{manche} ---\n\n')
         self._start_time = self.get_clock().now()
+        self._mission_started = True
 
     def close_log(self) -> None:
         """
