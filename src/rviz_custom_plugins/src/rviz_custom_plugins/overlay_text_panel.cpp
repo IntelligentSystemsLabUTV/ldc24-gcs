@@ -7,20 +7,14 @@ OverlayTextPanel::OverlayTextPanel(QWidget * parent)
 : rviz_common::Panel(parent), topic_name_("/your_custom_topic")
 {
   // Create GUI elements
-  topic_info_label_ = new QLabel("Topic:");
-  topic_input_ = new QLineEdit(topic_name_);
-  label_ = new QLabel("Waiting for message...");
-
-  // Layouts
-  QHBoxLayout * topic_layout = new QHBoxLayout;
-  topic_layout->addWidget(topic_info_label_);
-  topic_layout->addWidget(topic_input_);
-
   QHBoxLayout * layout = new QHBoxLayout;
+  label_ = new QLabel("Waiting for message...");
   layout->addWidget(label_);
+  layout->setAlignment(label_, Qt::AlignTop | Qt::AlignLeft);
   setLayout(layout);
 
   // Connect signals and slots
+  topic_input_ = new QLineEdit(topic_name_);
   connect(topic_input_, SIGNAL(editingFinished()), this, SLOT(updateTopic()));
 }
 
@@ -73,9 +67,9 @@ void OverlayTextPanel::updateTopic()
 void OverlayTextPanel::callback(const std_msgs::msg::String::SharedPtr msg)
 {
   std::string color;
-  if (msg->data == "INIT") {
-    color = "#000000";     // Black
-  } else if (msg->data == "TAKEOFF" || msg->data == "EMERGENCY_LANDING" || msg->data == "ARM" ||
+  if (msg->data == "EMERGENCY_LANDING" || msg->data == "RTB") {
+    color = "#8b0000";     // Dark red
+  } else if (msg->data == "TAKEOFF" || msg->data == "ARM" ||
     msg->data == "DISARM")
   {
     color = "#feb000";     // Dark yellow
@@ -85,12 +79,10 @@ void OverlayTextPanel::callback(const std_msgs::msg::String::SharedPtr msg)
     color = "#008b8b";     // Dark cyan
   } else if (msg->data == "FOLLOWME") {
     color = "#cc8400";     // Dark orange
-  } else if (msg->data == "RTB") {
-    color = "#4b0082";     // Dark purple
   } else if (msg->data == "COMPLETED") {
     color = "#006400";     // Dark green
   } else {
-    color = "#8b0000";     // Dark red
+    color = "#000000";     // Black
   }
   QString text = QString("<font color='%1' style='font-size:%2px;'>%3</font>")
     .arg(color.c_str())

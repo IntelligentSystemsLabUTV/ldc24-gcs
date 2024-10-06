@@ -210,7 +210,7 @@ function visual_targets {
     return 1
   fi
 
-  ros2 topic pub --once /visual_targets dua_interfaces/msg/VisualTargets "{
+  ros2 topic pub --once /hmi/found_targets/visual dua_interfaces/msg/VisualTargets "{
     targets: {
       header: {
         stamp: {sec: 0, nanosec: 0},
