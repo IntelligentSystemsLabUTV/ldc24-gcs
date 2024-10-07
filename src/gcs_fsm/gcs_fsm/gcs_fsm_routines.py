@@ -133,7 +133,7 @@ def init_routine(node: GCSFSMNode) -> str:
 
     # Open log file
     node.open_log(manche)
-    node.log("Mission started")
+    node.log("--- START OF MISSION ---")
 
     # Send mission data to agents
     node.mission_data_pub.publish(String(data=json.dumps(mission_data)))
@@ -378,6 +378,8 @@ def emergency_landing_routine(node: GCSFSMNode) -> str:
     node.emergency_landing = False
     node.get_logger().info('UAV emergency landing triggered')
     node.log("UAV emergency landing started")
+    time.sleep(5.0)
+    node.log("UAV emergency landing completed")
 
     return 'emergency_landing_done'
 

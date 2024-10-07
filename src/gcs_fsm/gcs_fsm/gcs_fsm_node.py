@@ -378,17 +378,17 @@ class GCSFSMNode(Node):
             '/gcs/fsm_state',
             dua_qos.get_datum_qos())
 
-        # hmi/markers
-        self.markers_pub = self.create_publisher(
-            MarkerArray,
-            '/hmi/markers',
-            dua_qos.get_datum_qos())
+        # # hmi/markers
+        # self.markers_pub = self.create_publisher(
+        #     MarkerArray,
+        #     '/hmi/markers',
+        #     dua_qos.get_datum_qos())
 
-        # hmi/pictures
-        self.pictures_pub = self.create_publisher(
-            Image,
-            '/hmi/pictures',
-            dua_qos.get_image_qos())
+        # # hmi/pictures
+        # self.pictures_pub = self.create_publisher(
+        #     Image,
+        #     '/hmi/pictures',
+        #     dua_qos.get_image_qos())
 
     def _init_service_clients(self) -> None:
         """
@@ -736,7 +736,7 @@ class GCSFSMNode(Node):
         :param msg: Message to log.
         """
         elapsed_time: Duration = self.get_clock().now() - self._start_time
-        log_str = f'[{elapsed_time.to_msg().sec}]: {msg}\n'
+        log_str = f'[T0 + {elapsed_time.to_msg().sec} s]: {msg}\n'
         self._log_file.write(log_str)
 
     def log_target(self, target_data: VisualTargets) -> None:
@@ -755,30 +755,31 @@ class GCSFSMNode(Node):
         target_id = target_id_orig.replace(' ', '_')
 
         # Log target data to file
-        self.log(f'Target ({target_id}, {color[0]}) found by {agent} at ({target_position.x}, {target_position.y}, {target_position.z})')
+        # self.log(f'Target ({target_id}, {color[0]}) found by {agent} at ({target_position.x}, {target_position.y}, {target_position.z})')
+        self.log(f'Target ({target_id}) found by {agent} at ({target_position.x:.2f}, {target_position.y:.2f}, {target_position.z:.2f})')
 
-        # Save new marker
-        marker_scale = 0.3
-        marker_msg = Marker()
-        marker_msg.header.frame_id = 'map'
-        marker_msg.header.stamp = self.get_clock().now().to_msg()
-        marker_msg.type = Marker.SPHERE
-        marker_msg.action = Marker.ADD
-        marker_msg.pose.position = target_position
-        marker_msg.scale = Vector3(x=marker_scale, y=marker_scale, z=marker_scale)
-        marker_msg.color.r = color[1][0]
-        marker_msg.color.g = color[1][1]
-        marker_msg.color.b = color[1][2]
-        marker_msg.color.a = 1.0
-        self._markers.append(marker_msg)
+        # # Save new marker
+        # marker_scale = 0.3
+        # marker_msg = Marker()
+        # marker_msg.header.frame_id = 'map'
+        # marker_msg.header.stamp = self.get_clock().now().to_msg()
+        # marker_msg.type = Marker.SPHERE
+        # marker_msg.action = Marker.ADD
+        # marker_msg.pose.position = target_position
+        # marker_msg.scale = Vector3(x=marker_scale, y=marker_scale, z=marker_scale)
+        # marker_msg.color.r = color[1][0]
+        # marker_msg.color.g = color[1][1]
+        # marker_msg.color.b = color[1][2]
+        # marker_msg.color.a = 1.0
+        # self._markers.append(marker_msg)
 
-        # Publish target data to HMI
-        marker_array_msg = MarkerArray()
-        marker_array_msg.markers = self._markers
-        self.markers_pub.publish(marker_array_msg)
+        # # Publish target data to HMI
+        # marker_array_msg = MarkerArray()
+        # marker_array_msg.markers = self._markers
+        # self.markers_pub.publish(marker_array_msg)
 
-        # Publish target picture to HMI
-        self.pictures_pub.publish(target_picture)
+        # # Publish target picture to HMI
+        # self.pictures_pub.publish(target_picture)
 
         # Save target picture
         cv_image = self._cv_bridge.imgmsg_to_cv2(target_picture, 'bgr8')
