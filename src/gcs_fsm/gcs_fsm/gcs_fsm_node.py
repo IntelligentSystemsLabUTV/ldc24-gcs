@@ -785,4 +785,4 @@ class GCSFSMNode(Node):
         cv_image = self._cv_bridge.imgmsg_to_cv2(target_picture, 'bgr8')
         cv.imwrite(f'/home/neo/workspace/logs/target_{target_id}_{agent}.png', cv_image)
 
-        self.get_logger().warn(f'{target_id_orig} found by {agent} at ({target_position.x}, {target_position.y}, {target_position.z})')
+        self.get_logger().warn(f'{target_id_orig} found by {agent} at ({target_position.x:.2f}, {target_position.y:.2f}, {target_position.z:.2f})')
