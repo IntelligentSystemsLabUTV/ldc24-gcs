@@ -63,32 +63,32 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([dottorcane_desc]))
     ld.add_action(dottorcane_desc_ld)
 
-    # Composable node container
-    container = ComposableNodeContainer(
-        name='gcs_container',
-        namespace='gcs',
-        package='dua_app_management',
-        executable='dua_component_container_mt',
-        emulate_tty=True,
-        output='both',
-        log_cmd=True,
-        composable_node_descriptions=[
-            # ZED DRIVERS #
-            ComposableNode(
-                package='zed_driver',
-                plugin='zed_drivers::ZEDDriverNode',
-                name='arianna_zed2i_driver',
-                namespace='gcs',
-                parameters=[config]),
-            ComposableNode(
-                package='zed_driver',
-                plugin='zed_drivers::ZEDDriverNode',
-                name='dottorcane_zed2i_driver',
-                namespace='gcs',
-                parameters=[config])
-        ]
-    )
-    ld.add_action(container)
+    # # Composable node container
+    # container = ComposableNodeContainer(
+    #     name='gcs_container',
+    #     namespace='gcs',
+    #     package='dua_app_management',
+    #     executable='dua_component_container_mt',
+    #     emulate_tty=True,
+    #     output='both',
+    #     log_cmd=True,
+    #     composable_node_descriptions=[
+    #         # ZED DRIVERS #
+    #         ComposableNode(
+    #             package='zed_driver',
+    #             plugin='zed_drivers::ZEDDriverNode',
+    #             name='arianna_zed2i_driver',
+    #             namespace='gcs',
+    #             parameters=[config]),
+    #         ComposableNode(
+    #             package='zed_driver',
+    #             plugin='zed_drivers::ZEDDriverNode',
+    #             name='dottorcane_zed2i_driver',
+    #             namespace='gcs',
+    #             parameters=[config])
+    #     ]
+    # )
+    # ld.add_action(container)
 
     # GCS FSM
     fsm_node = Node(
