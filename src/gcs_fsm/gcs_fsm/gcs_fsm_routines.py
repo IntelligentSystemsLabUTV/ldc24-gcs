@@ -323,8 +323,26 @@ def followme_routine(node: GCSFSMNode) -> str:
         time.sleep(1.0)
         if collimate_future.done():
             # Try to recover collimation: send UAV to next waypoint
-            nav_goal.target.z = 2.0
-            node.arianna_navigate_client.call(nav_goal)
+            curr_pose = node.get_agent_pose('arianna')
+            reach_goal: Reach.Goal = Reach.Goal(
+                target_pose=PoseStamped(
+                    header=Header(
+                        stamp=node.get_clock().now().to_msg(),
+                        frame_id='map'
+                    ),
+                    pose=Pose(
+                        position=Point(
+                            nav_goal.target.x,
+                            nav_goal.target.y,
+                            2.0
+                        ),
+                        orientation=curr_pose.pose.orientation
+                    )
+                ),
+                reach_radius=0.1,
+                stop_at_target=True
+            )
+            node.arianna_reach_client.call(reach_goal)
             collimator_goal_handle = node.arianna_collimate_client.send_goal_sync(collimator_goal)
             if collimator_goal_handle is None:
                 collimate_done = True
