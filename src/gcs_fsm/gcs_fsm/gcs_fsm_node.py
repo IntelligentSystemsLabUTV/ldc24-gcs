@@ -102,6 +102,7 @@ class GCSFSMNode(Node):
         self.stop = False
         self.emergency_landing_id = ''
         self.followme_start_time = 0.0
+        self.followme_orig_start_time = 0.0
         self.followme_waypoints = []
         self._color_counter = 0
         self._log_file = None
@@ -603,7 +604,8 @@ class GCSFSMNode(Node):
         if self._mission_started and not self.followme and not self.followme_done:
             curr_time = self.get_clock().now()
             elapsed_time: Duration = curr_time - self._start_time
-            if float(elapsed_time.nanoseconds) / float(1e6) >= (self.followme_start_time * 1000.0):
+            if float(elapsed_time.nanoseconds) / float(1e6) >= (self.followme_start_time * 1000.0) or \
+               (len(self.valid_ids) == 0 and (float(elapsed_time.nanoseconds) / float(1e6)) >= (self.followme_orig_start_time * 1000.0)):
                 self.followme = True
 
     def get_agent_pose(self, agent: str) -> PoseStamped:
