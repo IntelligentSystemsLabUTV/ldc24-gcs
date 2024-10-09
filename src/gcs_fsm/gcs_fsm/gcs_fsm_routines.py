@@ -103,7 +103,9 @@ def init_routine(node: GCSFSMNode) -> str:
 
     # Parse FollowMe waypoints
     if 'follow_me' in mission_data:
-        node.followme_start_time = float(mission_data['follow_me']['time'])
+        followme_start_time = float(mission_data['follow_me']['time'])
+        followme_start_time = max(followme_start_time, 60.0 * 5.0)
+        node.followme_start_time = followme_start_time
         for wp in mission_data['follow_me']['wps_coordinates_world']:
             node.followme_waypoints.append((float(wp[0]), float(wp[1])))
     else:
