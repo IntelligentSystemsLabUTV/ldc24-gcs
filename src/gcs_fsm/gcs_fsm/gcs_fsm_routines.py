@@ -47,7 +47,7 @@ def init_routine(node: GCSFSMNode) -> str:
                 "wget",
                 "-O",
                 "/home/neo/workspace/logs/mission.json",
-                "http://172.16.0.18:8080"
+                "http://172.16.0.19:8080"
             ],
             check=True)
     except subprocess.CalledProcessError as e:
@@ -332,9 +332,9 @@ def followme_routine(node: GCSFSMNode) -> str:
                     ),
                     pose=Pose(
                         position=Point(
-                            nav_goal.target.x,
-                            nav_goal.target.y,
-                            2.0
+                            x=nav_goal.target.x,
+                            y=nav_goal.target.y,
+                            z=2.0
                         ),
                         orientation=curr_pose.pose.orientation
                     )
