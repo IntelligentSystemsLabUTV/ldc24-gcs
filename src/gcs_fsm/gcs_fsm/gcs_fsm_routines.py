@@ -391,11 +391,13 @@ def emergency_landing_routine(node: GCSFSMNode) -> str:
     :return: Next trigger.
     """
     node.update_fsm_state('EMERGENCY_LANDING')
+    node.emergency_landing = False
 
     # Trigger UAV emergency landing
-    req: Trigger.Request = Trigger.Request()
-    node.arianna_emergency_landing_client.call_sync(req)
-    node.emergency_landing = False
+    msg = Empty()
+    for i in range(10):
+        time.sleep(0.1)
+        node.arianna_emergency_landing_pub.publish(msg)
     node.get_logger().info('UAV emergency landing triggered')
     node.log("UAV emergency landing started")
     time.sleep(5.0)

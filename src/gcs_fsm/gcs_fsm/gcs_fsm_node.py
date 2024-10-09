@@ -378,6 +378,12 @@ class GCSFSMNode(Node):
             '/gcs/fsm_state',
             dua_qos.get_datum_qos())
 
+        # arianna/emergency_landing
+        self.arianna_emergency_landing_pub = self.create_publisher(
+            Empty,
+            '/arianna/emergency_landing',
+            dua_qos.get_datum_qos())
+
         # # hmi/markers
         # self.markers_pub = self.create_publisher(
         #     MarkerArray,
@@ -399,13 +405,6 @@ class GCSFSMNode(Node):
             self,
             SafeLanding,
             '/arianna/navigation_stack/navigator/safe_landing',
-            self.wait_servers)
-
-        # arianna/emergency_landing
-        self.arianna_emergency_landing_client = ServiceClient(
-            self,
-            Trigger,
-            '/arianna/emergency_landing',
             self.wait_servers)
 
         # arianna/rtb
