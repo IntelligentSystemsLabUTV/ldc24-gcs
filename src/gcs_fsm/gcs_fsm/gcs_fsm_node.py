@@ -385,6 +385,12 @@ class GCSFSMNode(Node):
             '/arianna/emergency_landing',
             dua_qos.get_datum_qos())
 
+        # rtb
+        self.rtb_pub = self.create_publisher(
+            Empty,
+            '/rtb',
+            dua_qos.get_datum_qos())
+
         # # hmi/markers
         # self.markers_pub = self.create_publisher(
         #     MarkerArray,
@@ -401,32 +407,11 @@ class GCSFSMNode(Node):
         """
         Initialize service clients.
         """
-        # arianna/navigation_stack/navigator/safe_landing
-        self.arianna_safe_landing_client = ServiceClient(
-            self,
-            SafeLanding,
-            '/arianna/navigation_stack/navigator/safe_landing',
-            self.wait_servers)
-
-        # arianna/rtb
-        self.arianna_rtb_client = ServiceClient(
-            self,
-            SetBool,
-            '/arianna/rtb',
-            self.wait_servers)
-
         # arianna/followme
         self.arianna_followme_client = ServiceClient(
             self,
             SetBool,
             '/arianna/followme',
-            self.wait_servers)
-
-        # dottorcane/rtb
-        self.dottorcane_rtb_client = ServiceClient(
-            self,
-            SetBool,
-            '/dottorcane/rtb',
             self.wait_servers)
 
         # dottorcane/followme
