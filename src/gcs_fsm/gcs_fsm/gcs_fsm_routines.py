@@ -107,8 +107,15 @@ def init_routine(node: GCSFSMNode) -> str:
         node.followme_orig_start_time = float(mission_data['follow_me']['time'])
         followme_start_time = max(followme_start_time, 60.0 * 5.0)
         node.followme_start_time = followme_start_time
+        followme_lerciata = []
         for wp in mission_data['follow_me']['wps_coordinates_world']:
-            node.followme_waypoints.append((float(wp[0]), float(wp[1])))
+            followme_lerciata.append((float(wp[0]), float(wp[1])))
+        node.followme_waypoints.append(followme_lerciata[0])
+        for i in range(len(followme_lerciata) - 1):
+            mid_point = ((followme_lerciata[i][0] + followme_lerciata[i + 1][0]) / 2,
+                         (followme_lerciata[i][1] + followme_lerciata[i + 1][1]) / 2)
+            node.followme_waypoints.append(mid_point)
+            node.followme_waypoints.append(followme_lerciata[i + 1])
     else:
         node.get_logger().warn("No FollowMe waypoints specified")
 
@@ -198,16 +205,36 @@ def followme_routine(node: GCSFSMNode) -> str:
 
     # Get control of agents
     while True:
-        res1: SetBool.Response = node.arianna_followme_client.call_sync(on_req)
+        res1_future = node.arianna_followme_client.call_async(on_req)
+        tic = node.get_clock().now()
+        while not res1_future.done():
+            node.wait_spinning()
+            toc = node.get_clock().now()
+            diff: Duration = toc - tic
+            if diff.nanoseconds > 1e9:
+                break
+        if not res1_future.done():
+            node.get_logger().error('Failed to get control of UAV')
+            continue
+        res1 = res1_future.result()
         if res1.success:
             break
-        time.sleep(0.2)
     node.get_logger().info('UAV in FOLLOW_ME')
     while True:
-        res2: SetBool.Response = node.dottorcane_followme_client.call_sync(on_req)
+        res2_future = node.dottorcane_followme_client.call_async(on_req)
+        tic = node.get_clock().now()
+        while not res2_future.done():
+            node.wait_spinning()
+            toc = node.get_clock().now()
+            diff: Duration = toc - tic
+            if diff.nanoseconds > 1e9:
+                break
+        if not res2_future.done():
+            node.get_logger().error('Failed to get control of UGV')
+            continue
+        res2 = res2_future.result()
         if res2.success:
             break
-        time.sleep(0.2)
     time.sleep(2.0)
     node.get_logger().info('UGV in FOLLOW_ME')
 
@@ -240,17 +267,44 @@ def followme_routine(node: GCSFSMNode) -> str:
     dottorcane_goal_handle = node.dottorcane_navigate_client.send_goal_sync(dottorcane_nav_goal)
     if arianna_goal_handle is None or dottorcane_goal_handle is None:
         node.get_logger().error('Failed to send FollowMe start goals')
+        if arianna_goal_handle is not None:
+            node.arianna_navigate_client.cancel_sync(arianna_goal_handle)
+            node.arianna_navigate_client.get_result_sync(arianna_goal_handle)
+        if dottorcane_goal_handle is not None:
+            node.dottorcane_navigate_client.cancel_sync(dottorcane_goal_handle)
+            node.dottorcane_navigate_client.get_result_sync(dottorcane_goal_handle)
         # Give back control of agents
         while True:
-            res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+            res1_future = node.arianna_followme_client.call_async(off_req)
+            tic = node.get_clock().now()
+            while not res1_future.done():
+                node.wait_spinning()
+                toc = node.get_clock().now()
+                diff: Duration = toc - tic
+                if diff.nanoseconds > 1e9:
+                    break
+            if not res1_future.done():
+                node.get_logger().error('Failed to give back control of UAV')
+                continue
+            res1 = res1_future.result()
             if res1.success:
                 break
-            time.sleep(0.2)
+        node.get_logger().info('UAV back in control')
         while True:
-            res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+            res2_future = node.dottorcane_followme_client.call_async(off_req)
+            tic = node.get_clock().now()
+            while not res2_future.done():
+                node.wait_spinning()
+                toc = node.get_clock().now()
+                diff: Duration = toc - tic
+                if diff.nanoseconds > 1e9:
+                    break
+            if not res2_future.done():
+                node.get_logger().error('Failed to give back control of UGV')
+                continue
+            res2 = res2_future.result()
             if res2.success:
                 break
-            time.sleep(0.2)
         node.get_logger().info('Agents back in control')
         return 'followme_done'
     node.get_logger().info('FollowMe start goals sent')
@@ -262,15 +316,36 @@ def followme_routine(node: GCSFSMNode) -> str:
         node.get_logger().error('Error executing FollowMe')
         # Give back control of agents
         while True:
-            res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+            res1_future = node.arianna_followme_client.call_async(off_req)
+            tic = node.get_clock().now()
+            while not res1_future.done():
+                node.wait_spinning()
+                toc = node.get_clock().now()
+                diff: Duration = toc - tic
+                if diff.nanoseconds > 1e9:
+                    break
+            if not res1_future.done():
+                node.get_logger().error('Failed to give back control of UAV')
+                continue
+            res1 = res1_future.result()
             if res1.success:
                 break
-            time.sleep(0.2)
+        node.get_logger().info('UAV back in control')
         while True:
-            res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+            res2_future = node.dottorcane_followme_client.call_async(off_req)
+            tic = node.get_clock().now()
+            while not res2_future.done():
+                node.wait_spinning()
+                toc = node.get_clock().now()
+                diff: Duration = toc - tic
+                if diff.nanoseconds > 1e9:
+                    break
+            if not res2_future.done():
+                node.get_logger().error('Failed to give back control of UGV')
+                continue
+            res2 = res2_future.result()
             if res2.success:
                 break
-            time.sleep(0.2)
         node.get_logger().info('Agents back in control')
         return 'followme_done'
     node.get_logger().info('Agents at FollowMe start point')
@@ -286,15 +361,36 @@ def followme_routine(node: GCSFSMNode) -> str:
         node.get_logger().error('Error sending collimator goal')
         # Give back control of agents
         while True:
-            res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+            res1_future = node.arianna_followme_client.call_async(off_req)
+            tic = node.get_clock().now()
+            while not res1_future.done():
+                node.wait_spinning()
+                toc = node.get_clock().now()
+                diff: Duration = toc - tic
+                if diff.nanoseconds > 1e9:
+                    break
+            if not res1_future.done():
+                node.get_logger().error('Failed to give back control of UAV')
+                continue
+            res1 = res1_future.result()
             if res1.success:
                 break
-            time.sleep(0.2)
+        node.get_logger().info('UAV back in control')
         while True:
-            res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+            res2_future = node.dottorcane_followme_client.call_async(off_req)
+            tic = node.get_clock().now()
+            while not res2_future.done():
+                node.wait_spinning()
+                toc = node.get_clock().now()
+                diff: Duration = toc - tic
+                if diff.nanoseconds > 1e9:
+                    break
+            if not res2_future.done():
+                node.get_logger().error('Failed to give back control of UGV')
+                continue
+            res2 = res2_future.result()
             if res2.success:
                 break
-            time.sleep(0.2)
         node.get_logger().info('Agents back in control')
         return 'followme_done'
     node.get_logger().info('UAV collimation started')
@@ -320,7 +416,8 @@ def followme_routine(node: GCSFSMNode) -> str:
                 x=node.followme_waypoints[i][0],
                 y=node.followme_waypoints[i][1],
                 z=0.33
-            )
+            ),
+            heading=6.28
         )
         node.dottorcane_navigate_client.call(nav_goal)
         time.sleep(1.0)
@@ -369,17 +466,39 @@ def followme_routine(node: GCSFSMNode) -> str:
 
     # Give back control of agents
     node.log('FollowMe completed')
+    node.get_logger().info('FollowMe completed')
     while True:
-        res1: SetBool.Response = node.arianna_followme_client.call_sync(off_req)
+        res1_future = node.arianna_followme_client.call_async(off_req)
+        tic = node.get_clock().now()
+        while not res1_future.done():
+            node.wait_spinning()
+            toc = node.get_clock().now()
+            diff: Duration = toc - tic
+            if diff.nanoseconds > 1e9:
+                break
+        if not res1_future.done():
+            node.get_logger().error('Failed to give back control of UAV')
+            continue
+        res1 = res1_future.result()
         if res1.success:
             break
-        time.sleep(0.2)
+    node.get_logger().info('UAV back in control')
     while True:
-        res2: SetBool.Response = node.dottorcane_followme_client.call_sync(off_req)
+        res2_future = node.dottorcane_followme_client.call_async(off_req)
+        tic = node.get_clock().now()
+        while not res2_future.done():
+            node.wait_spinning()
+            toc = node.get_clock().now()
+            diff: Duration = toc - tic
+            if diff.nanoseconds > 1e9:
+                break
+        if not res2_future.done():
+            node.get_logger().error('Failed to give back control of UGV')
+            continue
+        res2 = res2_future.result()
         if res2.success:
             break
-        time.sleep(0.2)
-    node.get_logger().info('Agents back in control')
+    node.get_logger().info('UGV back in control')
 
     return 'followme_done'
 
